@@ -1,0 +1,20 @@
+[project]
+name = "geomech"
+version = "0.1.0"
+description = "Интерфейс базы данных геомеханики"
+license = "MIT"
+
+[dependencies]
+python = "^3.10"
+wxPython = "^4.2.1"
+pony = "^0.7.16"
+psycopg2 = "^2.9.9"
+pyinstaller = "^6.0.0"
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 180
+skip-magic-trailing-comma = true

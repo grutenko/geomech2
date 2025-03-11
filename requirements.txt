@@ -1,0 +1,4 @@
+wxpython==4.2.1
+pony==0.7.9
+psycopg2==2.9.10
+python-dateutil==2.9.0
