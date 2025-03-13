@@ -1,7 +1,8 @@
 import logging
 import os
+import sys
+import traceback
 
-import click
 import wx
 
 import src.database
@@ -12,6 +13,21 @@ from src.ui.windows.main import MainWindow
 
 if __name__ == "__main__":
     app = wx.App(False, useBestVisual=True)
+
+    def show_exception(e: Exception):
+        message = "Uncaught exception:\n"
+        message += "".join(traceback.format_exception(e.__class__, e, e.__traceback__))
+        logging.exception(message)
+
+        dlg = wx.MessageDialog(None, "Ошибка: " + str(e), str(e.__class__), wx.OK | wx.ICON_ERROR)
+        dlg.ShowModal()
+        dlg.Destroy()
+
+    def excepthook(exception_type, exception_value, exception_traceback):
+        show_exception(exception_value)
+
+    sys.excepthook = excepthook
+
     if "GEOMECH_CONFDIR" in os.environ:
         datadir = os.environ["GEOMECH_CONFDIR"]
     else:

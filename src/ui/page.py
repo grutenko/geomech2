@@ -1,6 +1,9 @@
 from typing import Protocol, runtime_checkable
 
 import wx
+import wx.lib.newevent
+
+PageHdrChangedEvent, EVT_PAGE_HDR_CHANGED = wx.lib.newevent.NewEvent()
 
 
 @runtime_checkable

@@ -1,12 +1,12 @@
 from dataclasses import dataclass
+
 from src.config import Config
-import src.ui.windows.main
 
 
 @dataclass
 class AppCtx:
     config: Config = None
-    main: src.ui.windows.main.MainWindow = None
+    main: object = None
 
 
 __ctx__: AppCtx = AppCtx()

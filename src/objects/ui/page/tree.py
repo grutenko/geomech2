@@ -5,6 +5,7 @@ import pubsub.pub
 import wx
 from pony.orm import commit, db_session, desc, select
 
+from src.ctx import app_ctx
 from src.database import BoreHole, DischargeMeasurement, DischargeSeries, MineObject, OrigSampleSet, PMSample, PMSampleSet, Station
 from src.delete_object import delete_object
 from src.identity import Identity
@@ -257,6 +258,21 @@ class _TreeWidget(TreeWidget):
         self._mode = "all"
         self.Bind(EVT_WIDGET_TREE_MENU, self._on_node_context_menu)
         self.Bind(EVT_WIDGET_TREE_ACTIVATED, self._on_node_activated)
+        pubsub.pub.subscribe(self.on_objects_changed, "object.added")
+
+    def on_objects_changed(self, o):
+        node = None
+        if isinstance(o, MineObject):
+            node = _MineObject_Node(o)
+        elif isinstance(o, Station):
+            node = _Station_Node(o)
+        elif isinstance(o, BoreHole):
+            node = _BoreHole_Node(o)
+        elif isinstance(o, OrigSampleSet):
+            node = OrigSampleSet(o)
+        else:
+            return
+        self.soft_reload_childrens(node.get_parent())
 
     def _create_node(self, o):
         if isinstance(o, MineObject):
@@ -271,8 +287,8 @@ class _TreeWidget(TreeWidget):
 
     @db_session
     def _on_node_activated(self, event):
-        if isinstance(event.node.o, OrigSampleSet) and select(o for o in DischargeSeries if o.orig_sample_set == event.node.o).count() > 0:
-            pubsub.pub.sendMessage("cmd.dm.open", target=self, identity=Identity(event.node.o, event.node.o))
+        if isinstance(event.node.o, MineObject):
+            app_ctx().main.open("mine_object_editor", is_new=False, o=event.node.o)
 
     @db_session
     def _mine_object_context_menu(self, node: _MineObject_Node, point: wx.Point):
@@ -340,8 +356,8 @@ class _TreeWidget(TreeWidget):
 
     def _create_object(self, parent_object, instance_class):
         window = wx.GetApp().GetTopWindow().FindFocus().GetTopLevelParent()
-        # if instance_class == MineObject:
-        #    dlg = DialogCreateMineObject(window, parent_object)
+        if instance_class == MineObject:
+            app_ctx().main.open("mine_object_editor", is_new=True, o=None, parent_object=parent_object)
         # elif instance_class == Station:
         #    dlg = DialogCreateStation(window, self._current_object)
         # elif instance_class == BoreHole:
