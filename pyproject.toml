@@ -1,8 +1,8 @@
 [project]
 name = "geomech"
-version = "0.1.0"
+version = "1.0.0"
 description = "Интерфейс базы данных геомеханики"
-license = "MIT"
+authors = [{name = "Горный институт КНЦ РАН", email = "goi@ksc.ru"},]
 
 [dependencies]
 python = "^3.10"

@@ -289,6 +289,10 @@ class _TreeWidget(TreeWidget):
     def _on_node_activated(self, event):
         if isinstance(event.node.o, MineObject):
             app_ctx().main.open("mine_object_editor", is_new=False, o=event.node.o)
+        elif isinstance(event.node.o, Station):
+            app_ctx().main.open("station_editor", is_new=False, o=event.node.o)
+        elif isinstance(event.node.o, BoreHole):
+            app_ctx().main.open("bore_hole_editor", is_new=False, o=event.node.o)
 
     @db_session
     def _mine_object_context_menu(self, node: _MineObject_Node, point: wx.Point):
@@ -358,10 +362,10 @@ class _TreeWidget(TreeWidget):
         window = wx.GetApp().GetTopWindow().FindFocus().GetTopLevelParent()
         if instance_class == MineObject:
             app_ctx().main.open("mine_object_editor", is_new=True, o=None, parent_object=parent_object)
-        # elif instance_class == Station:
-        #    dlg = DialogCreateStation(window, self._current_object)
-        # elif instance_class == BoreHole:
-        #    dlg = DialogCreateBoreHole(window, self._current_object)
+        elif instance_class == Station:
+            app_ctx().main.open("station_editor", is_new=True, o=None, parent_object=parent_object)
+        elif instance_class == BoreHole:
+            app_ctx().main.open("bore_hole_editor", is_new=True, o=None, parent_object=parent_object)
         # elif instance_class == OrigSampleSet:
         #    dlg = DialogCreateCore(window, self._current_object)
         # if dlg.ShowModal() == wx.ID_OK:

@@ -7,7 +7,7 @@ from src.ui.validators import TextValidator
 
 
 class LoginDialog(wx.Dialog):
-    def __init__(self):
+    def __init__(self, parent=None, mode="LOGIN"):
         super().__init__(None, title="База данных геомеханики")
         self.SetIcon(wx.Icon(get_icon("logo")))
         self.SetSize(270, 230)
@@ -46,7 +46,11 @@ class LoginDialog(wx.Dialog):
         hr = wx.StaticLine(self)
         sz.Add(hr, 0, wx.EXPAND)
         btn_sz = wx.StdDialogButtonSizer()
-        self.btn_login = wx.Button(self, label="Войти")
+        if mode == "LOGIN":
+            _name = "Войти"
+        else:
+            _name = "Изменить доступы"
+        self.btn_login = wx.Button(self, label=_name)
         btn_sz.Add(self.btn_login, 0)
         sz.Add(btn_sz, 0, wx.ALIGN_RIGHT | wx.ALL, border=10)
         self.SetSizer(sz)
