@@ -7,7 +7,7 @@ import wx
 from pony.orm import Database, DBException, db_session
 
 import src.database
-from src.config import Config
+from src.config import Config, load_from_file
 from src.ctx import app_ctx
 from src.ui.windows.login import LoginDialog
 from src.ui.windows.main import MainWindow
@@ -18,7 +18,7 @@ if os.getenv("_PYI_SPLASH_IPC"):
         from pyi_splash import close  # type: ignore
 
         close()
-    except:
+    except Exception:
         ...
 
 
@@ -53,12 +53,17 @@ if __name__ == "__main__":
         format="%(asctime)s - %(levelname)s - %(message)s",  # Формат записи
     )
 
+    config_filename = "%s/config.json" % datadir
+    _is_runtime = False
     try:
-        cfg = Config.from_file("%s/config.json" % datadir, create=True)
+        cfg = load_from_file(config_filename, create=True)
     except OSError as e:
         wx.MessageBox(str(e), "Ошибка конфигурации")
         cfg = Config.runtime()
+        _is_runtime = True
     app_ctx().config = cfg
+    app_ctx().config_filename = config_filename
+    app_ctx().config_is_fallback_runtime = _is_runtime
     _connection_failed = True
     if cfg.login is not None and cfg.password is not None and cfg.database is not None and cfg.host is not None and cfg.port is not None:
         try:

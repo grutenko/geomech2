@@ -6,7 +6,6 @@ from pony.orm import commit, db_session, select
 from src.ctx import app_ctx
 from src.database import CoordSystem, MineObject
 from src.ui.icon import get_icon
-from src.ui.page import PageHdrChangedEvent
 from src.ui.supplied_data import SuppliedDataWidget
 from src.ui.validators import TextValidator
 
@@ -20,7 +19,7 @@ class MineObjectEditor(wx.Panel):
         self.mine_objects = []
         self.coord_systems = []
         sz = wx.BoxSizer(wx.VERTICAL)
-        self.toolbar = wx.ToolBar(self, style=wx.TB_HORZ_TEXT)
+        self.toolbar = wx.ToolBar(self, style=wx.TB_HORZ_TEXT | wx.BORDER_DEFAULT)
         self.toolbar.AddTool(wx.ID_SAVE, "Сохранить", get_icon("save"))
         self.toolbar.Realize()
         sz.Add(self.toolbar, 0, wx.EXPAND)
@@ -56,13 +55,15 @@ class MineObjectEditor(wx.Panel):
 
         self.right = wx.Notebook(self.splitter)
         self.supplied_data = SuppliedDataWidget(self.right, deputy_text="Недоступно для новых объектов. Сначала сохраните.")
-        self.coords = wx.propgrid.PropertyGrid(self.right)
+        self.coords = wx.propgrid.PropertyGrid(self.right, style=wx.propgrid.PG_SPLITTER_AUTO_CENTER)
         self.coords.Append(wx.propgrid.FloatProperty("X Мин.", "X_Min"))
         self.coords.Append(wx.propgrid.FloatProperty("Y Мин.", "Y_Min"))
         self.coords.Append(wx.propgrid.FloatProperty("Z Мин.", "Z_Min"))
         self.coords.Append(wx.propgrid.FloatProperty("X Макс.", "X_Max"))
         self.coords.Append(wx.propgrid.FloatProperty("Y Макс.", "Y_Max"))
         self.coords.Append(wx.propgrid.FloatProperty("Z Макс.", "Z_Max"))
+        self.coords.SetSplitterPosition(350)
+        self.coords.Update()
         self.right.AddPage(self.coords, "Координаты")
         self.right.AddPage(self.supplied_data, "Сопуствующие материалы")
         self.splitter.SplitVertically(self.left, self.right, 250)

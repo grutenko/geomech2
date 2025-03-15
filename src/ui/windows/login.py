@@ -1,6 +1,7 @@
 import wx
 from pony.orm import Database
 
+from src.config import flush
 from src.ctx import app_ctx
 from src.ui.icon import get_icon
 from src.ui.validators import TextValidator
@@ -99,5 +100,5 @@ class LoginDialog(wx.Dialog):
             cfg.database = database
             cfg.host = host
             cfg.port = port
-            cfg.flush()
+            flush(cfg, app_ctx().config_filename)
             self.EndModal(wx.ID_OK)

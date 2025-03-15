@@ -23,6 +23,7 @@ class StationEditor(wx.Panel):
         sz = wx.BoxSizer(wx.VERTICAL)
         self.toolbar = wx.ToolBar(self, style=wx.TB_HORZ_TEXT)
         self.toolbar.AddTool(wx.ID_SAVE, "Сохранить", get_icon("save"))
+        self.toolbar.Realize()
         sz.Add(self.toolbar, 0, wx.EXPAND)
         self.splitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)
         self.left = wx.Panel(self.splitter)
@@ -63,7 +64,7 @@ class StationEditor(wx.Panel):
 
         self.right = wx.Notebook(self.splitter)
         self.supplied_data = SuppliedDataWidget(self.right, deputy_text="Недоступно для новых объектов. Сначала сохраните.")
-        self.coords = wx.propgrid.PropertyGrid(self.right)
+        self.coords = wx.propgrid.PropertyGrid(self.right, style=wx.propgrid.PG_SPLITTER_AUTO_CENTER)
         self.coords.Append(wx.propgrid.FloatProperty("X Мин.", "X_Min"))
         self.coords.Append(wx.propgrid.FloatProperty("Y Мин.", "Y_Min"))
         self.coords.Append(wx.propgrid.FloatProperty("Z Мин.", "Z_Min"))

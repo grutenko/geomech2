@@ -8,31 +8,32 @@ from setuptools.command.build_py import build_py
 class BuildExecutable(build_py):
     def run(self):
         """Run PyInstaller to build the executable before the actual build process"""
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "PyInstaller",
-                "--windowed",
-                "--noconfirm",
-                "--onefile",
-                "--clean",
-                "--strip",
-                "--splash=icons/logo.png",
-                "--add-data=icons:icons",
-                "--icon=icons/logo.png",
-                "--name=geomech",
-                "--hidden-import=wx._xml",
-                "--hidden-import=pony.orm.dbproviders",
-                "--hidden-import=pony.orm.dbproviders.postgres",
-                "--hidden-import=psycopg2",
-                "--hidden-import=transliterate",
-                "--hidden-import=transliterate.contrib.languages",
-                "--optimize=2",
-                "__main__.py",
-            ],  # Create a single executable file  # Name of the output file  # Your main script
-            check=True,
-        )
+        args = [
+            sys.executable,
+            "-m",
+            "PyInstaller",
+            "--windowed",
+            "--noconfirm",
+            "--onefile",
+            "--clean",
+            "--splash=icons/logo.png",
+            "--add-data=icons:icons",
+            "--name=geomech",
+            "--hidden-import=wx._xml",
+            "--hidden-import=pony.orm.dbproviders",
+            "--hidden-import=pony.orm.dbproviders.postgres",
+            "--hidden-import=psycopg2",
+            "--hidden-import=transliterate",
+            "--hidden-import=transliterate.contrib.languages",
+            "--optimize=2",
+        ]
+        if sys.platform != "win32":
+            args.append("--strip")
+            args.append("--icon=icons/logo.png")
+        else:
+            args.append("--icon=icons/logo.ico")
+        args.append("__main__.py")
+        subprocess.run(args, check=True)  # Create a single executable file  # Name of the output file  # Your main script
         super().run()
 
 

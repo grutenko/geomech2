@@ -3,18 +3,21 @@ from typing import Dict
 
 import wx
 import wx.aui
-from pony.orm import db_session, select
+from pony.orm import db_session
 
 import src.bore_hole.ui.page.bore_hole_editor
+import src.fms.ui.page.tree
 import src.mine_object.ui.page.mine_object_editor
 import src.objects.ui.page.tree
+import src.rock_burst.ui.page.editor
+import src.rock_burst.ui.page.list
 import src.station.ui.page.station_editor
-from src.database import MineObject
+from src.ctx import app_ctx
 from src.ui.icon import get_icon
 from src.ui.page import EVT_PAGE_HDR_CHANGED
 from src.ui.windows.login import LoginDialog
 
-from .actions import ID_CHANGE_CREDENTIALS, ID_OPEN_TREE
+from .actions import ID_CHANGE_CREDENTIALS, ID_OPEN_FMS_TREE, ID_OPEN_ROCK_BURST_TREE, ID_OPEN_TREE
 from .menu import MainMenu
 from .toolbar import MainToolbar
 
@@ -30,7 +33,7 @@ class PageCtx:
 class MainWindow(wx.Frame):
     @db_session
     def __init__(self):
-        super().__init__(None, title="База данных геомеханики", size=wx.Size(1280, 720))
+        super().__init__(None, title="База данных геомеханики", size=wx.Size(1280, 550))
         self.CenterOnScreen()
         self.SetIcon(wx.Icon(get_icon("logo")))
 
@@ -38,6 +41,9 @@ class MainWindow(wx.Frame):
         self.SetToolBar(self.toolbar)
         self.statusbar = wx.StatusBar(self)
         self.statusbar.SetFieldsCount(4)
+        cfg = app_ctx().config
+        status = "Подключено: %s, %s:%d, %s" % (cfg.database, cfg.host, cfg.port, cfg.login)
+        self.statusbar.SetStatusText(status)
         self.menu = MainMenu()
         self.SetMenuBar(self.menu)
         self.SetStatusBar(self.statusbar)
@@ -45,7 +51,7 @@ class MainWindow(wx.Frame):
         p = wx.Panel(self)
 
         self.mgr = wx.aui.AuiManager(p)
-        self.notebook = wx.aui.AuiNotebook(p, style=wx.aui.AUI_NB_DEFAULT_STYLE)
+        self.notebook = wx.aui.AuiNotebook(p, style=wx.aui.AUI_NB_DEFAULT_STYLE | wx.aui.AUI_NB_WINDOWLIST_BUTTON)
         self.notebook.SetSelectedFont(wx.Font(wx.FontInfo(10).Italic()))
         self.mgr.AddPane(self.notebook, wx.aui.AuiPaneInfo().CenterPane())
         self.mgr.Update()
@@ -64,8 +70,14 @@ class MainWindow(wx.Frame):
         def bore_hole_editor_def(o=None, is_new=False, parent_object=None):
             return src.bore_hole.ui.page.bore_hole_editor.BoreHoleEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
+        def rock_burst_editor_def(o=None, is_new=False, parent_object=None):
+            return src.rock_burst.ui.page.editor.RockBurstEditor(self.notebook, o=o, is_new=is_new, parent_object=parent_object)
+
         self.page_def = {
             "tree": lambda **kwds: src.objects.ui.page.tree.PageTree(self.notebook),
+            "fms_tree": lambda **kwds: src.fms.ui.page.tree.TreePage(self.notebook),
+            "rock_burst_list": lambda **kwds: src.rock_burst.ui.page.list.RockBurstWidget(self.notebook),
+            "rock_burst_editor": rock_burst_editor_def,
             "mine_object_editor": mine_object_editor_def,
             "station_editor": station_editor_def,
             "bore_hole_editor": bore_hole_editor_def,
@@ -82,7 +94,14 @@ class MainWindow(wx.Frame):
                     return False
             return True
 
-        self.page_cmp_args = {"tree": lambda args0, args1: True, "mine_object_editor": base_args_cmp, "station_editor": base_args_cmp, "bore_hole_editor": base_args_cmp}
+        self.page_cmp_args = {
+            "tree": lambda args0, args1: True,
+            "mine_object_editor": base_args_cmp,
+            "rock_burst_editor": base_args_cmp,
+            "station_editor": base_args_cmp,
+            "bore_hole_editor": base_args_cmp,
+            "rock_burst_list": lambda args0, args1: True,
+        }
         self.pages = []
 
         self.bind_all()
@@ -93,9 +112,37 @@ class MainWindow(wx.Frame):
         self.Bind(EVT_PAGE_HDR_CHANGED, self.on_page_header_changed)
         self.Bind(wx.EVT_MENU, self.on_change_credentials, id=ID_CHANGE_CREDENTIALS)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_toggle_tree, id=ID_OPEN_TREE)
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_toggle_fms_tree, id=ID_OPEN_FMS_TREE)
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_open_rock_bursts, id=ID_OPEN_ROCK_BURST_TREE)
         self.menu.Bind(wx.EVT_MENU, self.on_close_tab, id=wx.ID_CLOSE)
         self.menu.Bind(wx.EVT_MENU, self.on_next_tab, id=wx.ID_PREVIEW_NEXT)
         self.menu.Bind(wx.EVT_MENU, self.on_prev_tab, id=wx.ID_PREVIEW_PREVIOUS)
+
+    def on_open_rock_bursts(self, event):
+        _finded = False
+        _ctx = None
+        for ctx in self.pages:
+            if ctx.code == "rock_burst_list":
+                _finded = True
+                _ctx = ctx
+                break
+        if not _finded:
+            self.open("rock_burst_list")
+        else:
+            self.close(_ctx.o)
+
+    def on_toggle_fms_tree(self, event):
+        _finded = False
+        _ctx = None
+        for ctx in self.pages:
+            if ctx.code == "fms_tree":
+                _finded = True
+                _ctx = ctx
+                break
+        if not _finded:
+            self.open("fms_tree")
+        else:
+            self.close(_ctx.o)
 
     def on_page_changed(self, event):
         self.update_controls_state()
@@ -157,7 +204,7 @@ class MainWindow(wx.Frame):
             if ctx.o == wnd:
                 self.pages.__delitem__(index)
                 break
-        if event.GetClientData() == True:
+        if event.GetClientData():
             self.notebook.DeletePage(page_index)
         else:
             event.Skip()  # Позволяет закрытию завершиться
@@ -203,6 +250,19 @@ class MainWindow(wx.Frame):
                 _finded = True
                 break
         self.toolbar.ToggleTool(ID_OPEN_TREE, _finded)
+        _finded = False
+        for ctx in self.pages:
+            if ctx.code == "fms_tree":
+                _finded = True
+                break
+        self.toolbar.ToggleTool(ID_OPEN_FMS_TREE, _finded)
+        _finded = False
+        for ctx in self.pages:
+            if ctx.code == "rock_burst_list":
+                _finded = True
+                break
+        self.toolbar.ToggleTool(ID_OPEN_ROCK_BURST_TREE, _finded)
         self.menu.Enable(wx.ID_CLOSE, self.notebook.GetPageCount() > 0)
         self.menu.Enable(wx.ID_PREVIEW_NEXT, self.notebook.GetPageCount() > 0 and self.notebook.GetSelection() < self.notebook.GetPageCount() - 1)
         self.menu.Enable(wx.ID_PREVIEW_PREVIOUS, self.notebook.GetPageCount() > 0 and self.notebook.GetSelection() > 0)
+        self.toolbar.Realize()

@@ -264,3 +264,6 @@ class TreeWidget(wx.Panel):
     def _on_native_item_menu(self, event: wx.TreeEvent):
         self._tree.SelectItem(event.GetItem())
         wx.PostEvent(self, WidgetTreeMenu(node=self._tree.GetItemData(event.GetItem()).node, point=event.GetPoint()))
+
+    def get_current_root(self):
+        return self._root_node

@@ -447,7 +447,7 @@ class PMSampleSet(db.Entity):
     SampleCount = Optional(int, column="SampleCount")
 
     def get_tree_name(self):
-        return "[Набор образцов] " + self.Name
+        return "[Проба] " + self.Name
 
     @property
     def Name(self):

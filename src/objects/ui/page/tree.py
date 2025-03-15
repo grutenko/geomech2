@@ -3,14 +3,13 @@ from typing import List, Tuple
 import pubsub
 import pubsub.pub
 import wx
-from pony.orm import commit, db_session, desc, select
+from pony.orm import db_session, desc, select
 
 from src.ctx import app_ctx
 from src.database import BoreHole, DischargeMeasurement, DischargeSeries, MineObject, OrigSampleSet, PMSample, PMSampleSet, Station
 from src.delete_object import delete_object
 from src.identity import Identity
 from src.ui.icon import get_art, get_icon
-from src.ui.page import PageProto
 from src.ui.tree import EVT_WIDGET_TREE_ACTIVATED, EVT_WIDGET_TREE_MENU, TreeNode, TreeWidget
 
 
@@ -26,7 +25,7 @@ class _MineObject_Node(TreeNode):
         self.o = MineObject[self.o.RID]
 
     def get_parent(self) -> TreeNode:
-        if self.p != None:
+        if self.p is not None:
             return _MineObject_Node(self.p)
         else:
             return _Root_Node()
@@ -111,7 +110,7 @@ class _BoreHole_Node(TreeNode):
     def get_parent(self) -> TreeNode:
         if self._root_as_parent:
             return _BoreHolesRoot_Node()
-        if self.p_station != None:
+        if self.p_station is not None:
             return _Station_Node(self.p_station)
         else:
             return _MineObject_Node(self.p_mine_object)
@@ -125,13 +124,8 @@ class _BoreHole_Node(TreeNode):
     def get_icon_open(self) -> Tuple[str | wx.Bitmap] | None:
         return "folder-open", get_icon("folder-open", 16)
 
-    @db_session(optimistic=False)
-    def get_subnodes(self) -> List[TreeNode]:
-        core = select(o for o in OrigSampleSet if o.bore_hole == self.o).first()
-        if core != None:
-            return [_Core_Node(core)]
-        else:
-            return []
+    def is_leaf(self):
+        return True
 
     def __eq__(self, o):
         return isinstance(o, _BoreHole_Node) and o.o.RID == self.o.RID
@@ -236,18 +230,308 @@ class _BoreHolesRoot_Node(TreeNode):
     def is_root(self) -> bool:
         return True
 
-    @db_session(optimistic=False)
-    def get_subnodes(self) -> List[TreeNode]:
-        nodes = []
-        for o in select(o for o in BoreHole).order_by(lambda x: desc(x.RID)):
-            nodes.append(_BoreHole_Node(o, root_as_parent=True))
-        return nodes
+    def is_leaf(self):
+        return True
 
-    def __eq__(self, o):
-        return isinstance(o, _BoreHolesRoot_Node)
+    def get_icon(self) -> Tuple[str, wx.Bitmap] | None:
+        return "folder", get_icon("folder", 16)
+
+    def get_icon_open(self) -> Tuple[str | wx.Bitmap] | None:
+        return "folder-open", get_icon("folder-open", 16)
 
 
 OpenSelfEditorEvent, EVT_TREE_OPEN_SELF_EDITOR = wx.lib.newevent.NewEvent()
+
+
+class _Q_Result_Node(TreeNode):
+    def __init__(self, o, parent):
+        self.o = o
+        self.parent = parent
+
+    def get_name(self):
+        return self.o.get_tree_name()
+
+    def get_parent(self):
+        return self.parent
+
+    def get_icon(self) -> Tuple[str, wx.Bitmap] | None:
+        return "file", get_icon("file", 16)
+
+    def __eq__(self, node):
+        return isinstance(node, _Q_Result_Node) and isinstance(node.o, self.o.__class__) and node.o.RID == self.o.RID
+
+    def is_leaf(self):
+        return True
+
+
+class _Q_Region_Node(TreeNode):
+    def __init__(self, q, parent):
+        self.o = None
+        self.q = q
+        self.parent = parent
+
+    @db_session
+    def get_name(self) -> str:
+        return "Регионы (%s)" % self.query().count()
+
+    def get_parent(self):
+        return self.parent
+
+    @db_session
+    def query(self):
+        return select(o for o in MineObject if o.Type == "REGION" and self.q in o.Name)
+
+    @db_session
+    def get_subnodes(self):
+        nodes = []
+        for o in self.query():
+            nodes.append(_Q_Result_Node(o, self))
+        return nodes
+
+    def get_icon(self) -> Tuple[str, wx.Bitmap] | None:
+        return "folder", get_icon("folder", 16)
+
+    def get_icon_open(self) -> Tuple[str | wx.Bitmap] | None:
+        return "folder-open", get_icon("folder-open", 16)
+
+    def __eq__(self, node):
+        return isinstance(node, _Q_Region_Node)
+
+
+class _Q_Rocks_Node(TreeNode):
+    def __init__(self, q, parent):
+        self.o = None
+        self.q = q
+        self.parent = parent
+
+    @db_session
+    def query(self):
+        return select(o for o in MineObject if o.Type == "ROCKS" and self.q in o.Name)
+
+    @db_session
+    def get_name(self) -> str:
+        return "Горные массивы (%s)" % self.query().count()
+
+    def get_parent(self):
+        return self.parent
+
+    @db_session
+    def get_subnodes(self):
+        nodes = []
+        for o in select(o for o in MineObject if o.Type == "ROCKS" and self.q in o.Name):
+            nodes.append(_Q_Result_Node(o, self))
+        return nodes
+
+    def get_icon(self) -> Tuple[str, wx.Bitmap] | None:
+        return "folder", get_icon("folder", 16)
+
+    def get_icon_open(self) -> Tuple[str | wx.Bitmap] | None:
+        return "folder-open", get_icon("folder-open", 16)
+
+    def __eq__(self, node):
+        return isinstance(node, _Q_Rocks_Node)
+
+
+class _Q_Fields_Node(TreeNode):
+    def __init__(self, q, parent):
+        self.o = None
+        self.q = q
+        self.parent = parent
+
+    @db_session
+    def query(self):
+        return select(o for o in MineObject if o.Type == "FIELD" and self.q in o.Name)
+
+    @db_session
+    def get_name(self) -> str:
+        return "Месторождения (%s)" % self.query().count()
+
+    def get_parent(self):
+        return self.parent
+
+    @db_session
+    def get_subnodes(self):
+        nodes = []
+        for o in select(o for o in MineObject if o.Type == "FIELD" and self.q in o.Name):
+            nodes.append(_Q_Result_Node(o, self))
+        return nodes
+
+    def get_icon(self) -> Tuple[str, wx.Bitmap] | None:
+        return "folder", get_icon("folder", 16)
+
+    def get_icon_open(self) -> Tuple[str | wx.Bitmap] | None:
+        return "folder-open", get_icon("folder-open", 16)
+
+    def __eq__(self, node):
+        return isinstance(node, _Q_Fields_Node)
+
+
+class _Q_Horizons_Node(TreeNode):
+    def __init__(self, q, parent):
+        self.o = None
+        self.q = q
+        self.parent = parent
+
+    @db_session
+    def get_name(self) -> str:
+        return "Горизонты (%s)" % self.query().count()
+
+    @db_session
+    def query(self):
+        return select(o for o in MineObject if o.Type == "HORIZON" and self.q in o.Name)
+
+    def get_parent(self):
+        return self.parent
+
+    @db_session
+    def get_subnodes(self):
+        nodes = []
+        for o in select(o for o in MineObject if o.Type == "HORIZON" and self.q in o.Name):
+            nodes.append(_Q_Result_Node(o, self))
+        return nodes
+
+    def get_icon(self) -> Tuple[str, wx.Bitmap] | None:
+        return "folder", get_icon("folder", 16)
+
+    def get_icon_open(self) -> Tuple[str | wx.Bitmap] | None:
+        return "folder-open", get_icon("folder-open", 16)
+
+    def __eq__(self, node):
+        return isinstance(node, _Q_Horizons_Node)
+
+
+class _Q_Excavations_Node(TreeNode):
+    def __init__(self, q, parent):
+        self.o = None
+        self.q = q
+        self.parent = parent
+
+    @db_session
+    def get_name(self) -> str:
+        return "Выработки (%s)" % self.query().count()
+
+    @db_session
+    def query(self):
+        return select(o for o in MineObject if o.Type == "EXCAVATIO" and self.q in o.Name)
+
+    def get_parent(self):
+        return self.parent
+
+    @db_session
+    def get_subnodes(self):
+        nodes = []
+        for o in select(o for o in MineObject if o.Type == "EXCAVATION" and self.q in o.Name):
+            nodes.append(_Q_Result_Node(o, self))
+        return nodes
+
+    def get_icon(self) -> Tuple[str, wx.Bitmap] | None:
+        return "folder", get_icon("folder", 16)
+
+    def get_icon_open(self) -> Tuple[str | wx.Bitmap] | None:
+        return "folder-open", get_icon("folder-open", 16)
+
+    def __eq__(self, node):
+        return isinstance(node, _Q_Excavations_Node)
+
+
+class _Q_Stations_Node(TreeNode):
+    def __init__(self, q, parent):
+        self.o = None
+        self.q = q
+        self.parent = parent
+
+    @db_session
+    def get_name(self) -> str:
+        return "Станции (%s)" % self.query().count()
+
+    @db_session
+    def query(self):
+        return select(o for o in Station if self.q in o.Name)
+
+    @db_session
+    def get_subnodes(self):
+        nodes = []
+        for o in self.query():
+            nodes.append(_Q_Result_Node(o, self))
+        return nodes
+
+    def get_icon(self) -> Tuple[str, wx.Bitmap] | None:
+        return "folder", get_icon("folder", 16)
+
+    def get_icon_open(self) -> Tuple[str | wx.Bitmap] | None:
+        return "folder-open", get_icon("folder-open", 16)
+
+    def __eq__(self, node):
+        return isinstance(node, _Q_Stations_Node)
+
+
+class _Q_BoreHoles_Node(TreeNode):
+    def __init__(self, q, parent):
+        self.o = None
+        self.q = q
+        self.parent = parent
+
+    @db_session
+    def get_name(self) -> str:
+        return "Скважины (%s)" % self.query().count()
+
+    def get_icon(self) -> Tuple[str, wx.Bitmap] | None:
+        return "folder", get_icon("folder", 16)
+
+    @db_session
+    def query(self):
+        return select(o for o in BoreHole if self.q in o.Name)
+
+    @db_session
+    def get_subnodes(self):
+        nodes = []
+        for o in self.query():
+            nodes.append(_Q_Result_Node(o, self))
+        return nodes
+
+    def get_icon_open(self) -> Tuple[str | wx.Bitmap] | None:
+        return "folder-open", get_icon("folder-open", 16)
+
+    def __eq__(self, node):
+        return isinstance(node, _Q_BoreHoles_Node)
+
+
+class _Q_Root_Node(TreeNode):
+    def __init__(self, q, mode="all"):
+        self.o = None
+        self.q = q
+        self.mode = mode
+
+    def get_name(self) -> str:
+        return "Объекты"
+
+    def get_parent(self) -> TreeNode:
+        return _Root_Node()
+
+    @db_session(optimistic=False)
+    def get_subnodes(self) -> List[TreeNode]:
+        nodes = []
+        if self.mode == "all" or self.mode == "region":
+            nodes.append(_Q_Region_Node(self.q, self))
+        if self.mode == "all" or self.mode == "rocks":
+            nodes.append(_Q_Rocks_Node(self.q, self))
+        if self.mode == "all" or self.mode == "fields":
+            nodes.append(_Q_Fields_Node(self.q, self))
+        if self.mode == "all" or self.mode == "horizons":
+            nodes.append(_Q_Horizons_Node(self.q, self))
+        if self.mode == "all" or self.mode == "excavations":
+            nodes.append(_Q_Excavations_Node(self.q, self))
+        if self.mode == "all" or self.mode == "stations":
+            nodes.append(_Q_Stations_Node(self.q, self))
+        if self.mode == "all" or self.mode == "bore_holes":
+            nodes.append(_Q_BoreHoles_Node(self.q, self))
+        return nodes
+
+    def is_root(self) -> bool:
+        return True
+
+    def __eq__(self, o):
+        return isinstance(o, _Q_Root_Node)
 
 
 class _TreeWidget(TreeWidget):
@@ -281,7 +565,7 @@ class _TreeWidget(TreeWidget):
             return _Station_Node(o)
         elif isinstance(o, BoreHole):
             return _BoreHole_Node(o)
-        elif isinstance(o, OrigSampleSet) and o.bore_hole != None:
+        elif isinstance(o, OrigSampleSet) and o.bore_hole is not None:
             return _Core_Node(o)
         return None
 
@@ -428,23 +712,37 @@ class _TreeWidget(TreeWidget):
     def _bore_hole_context_menu(self, node: _BoreHole_Node, point: wx.Point):
         self._current_object = node.o
         menu = wx.Menu()
-        subnode_menu = wx.Menu()
-        core = select(o for o in OrigSampleSet if o.bore_hole == node.o).first()
-        if core != None:
-            item = subnode_menu.Append(wx.ID_ANY, "(Добавлен) Привязать Керн")
-            item.Enable(False)
-        else:
-            item = subnode_menu.Append(wx.ID_ANY, "Привязать Керн")
-            subnode_menu.Bind(wx.EVT_MENU, self._on_create_core, item)
-        item = menu.AppendSubMenu(subnode_menu, "Добавить")
-        item.SetBitmap(get_art(wx.ART_NEW, scale_to=16))
         item = menu.Append(wx.ID_ANY, "Изменить")
         item.SetBitmap(get_icon("edit", scale_to=16))
         menu.Bind(wx.EVT_MENU, self._on_open_self_editor, item)
         menu.AppendSeparator()
         item = menu.Append(wx.ID_ANY, "Удалить")
         item.SetBitmap(get_icon("delete", scale_to=16))
-
+        menu.AppendSeparator()
+        m = wx.Menu()
+        orig_sample_set = select(o for o in OrigSampleSet if o.bore_hole == node.o).first()
+        series = select(o for o in DischargeSeries if o.orig_sample_set == orig_sample_set).first()
+        if series is None:
+            item = m.Append(wx.ID_ANY, "(Серия не создана) Открыть")
+            item.Enable(False)
+        else:
+            count = select(o for o in DischargeMeasurement if o.orig_sample_set == orig_sample_set).count()
+            item = m.Append(wx.ID_ANY, "Открыть (замеров: %d)" % count)
+        item.SetBitmap(get_icon("book-stack"))
+        m.Bind(wx.EVT_MENU, self._on_select_dm, item)
+        if series is None:
+            item = m.Append(wx.ID_ANY, "(Серия не создана) Удалить серию замеров")
+            item.Enable(False)
+        else:
+            item = m.Append(wx.ID_ANY, "Удалить серию замеров")
+            m.Bind(wx.EVT_MENU, self._on_delete_discharge_series, item)
+        if series is not None:
+            item = m.Append(wx.ID_ANY, "(Привязано) Создать серию замеров")
+            item.Enable(False)
+        else:
+            item = m.Append(wx.ID_ANY, "Создать серию замеров")
+            m.Bind(wx.EVT_MENU, self._on_create_discharge_series, item)
+        menu.AppendSubMenu(m, "Разгрузочные замеры")
         menu.Bind(wx.EVT_MENU, self._on_delete_bore_hole, item)
         menu.AppendSeparator()
 
@@ -469,30 +767,7 @@ class _TreeWidget(TreeWidget):
         item = menu.Append(wx.ID_ANY, "Удалить")
         item.SetBitmap(get_icon("delete", scale_to=16))
         menu.Bind(wx.EVT_MENU, self._on_delete_core, item)
-        menu.AppendSeparator()
-        m = wx.Menu()
-        series = select(o for o in DischargeSeries if o.orig_sample_set == node.o).first()
-        if series == None:
-            item = m.Append(wx.ID_ANY, "(Серия не создана) Открыть")
-            item.Enable(False)
-        else:
-            count = select(o for o in DischargeMeasurement if o.orig_sample_set == node.o).count()
-            item = m.Append(wx.ID_ANY, "Открыть (замеров: %d)" % count)
-        item.SetBitmap(get_icon("book-stack"))
-        m.Bind(wx.EVT_MENU, self._on_select_dm, item)
-        if series == None:
-            item = m.Append(wx.ID_ANY, "(Серия не создана) Удалить серию замеров")
-            item.Enable(False)
-        else:
-            item = m.Append(wx.ID_ANY, "Удалить серию замеров")
-            m.Bind(wx.EVT_MENU, self._on_delete_discharge_series, item)
-        if series != None:
-            item = m.Append(wx.ID_ANY, "(Привязано) Создать серию замеров")
-            item.Enable(False)
-        else:
-            item = m.Append(wx.ID_ANY, "Создать серию замеров")
-            m.Bind(wx.EVT_MENU, self._on_create_discharge_series, item)
-        menu.AppendSubMenu(m, "Разгрузочные замеры")
+
         item = menu.Append(wx.ID_ANY, "Сопутствующие материалы")
         item.SetBitmap(get_icon("versions"))
         menu.Bind(wx.EVT_MENU, self._on_open_supplied_data, item)
@@ -565,27 +840,69 @@ class _TreeWidget(TreeWidget):
 
         self.select_node(node)
 
+    def start_find(self, q, mode):
+        self.set_root_node(_Q_Root_Node(q, mode))
+
+    def end_find(self):
+        self.set_root_node(_Root_Node())
+
+    def is_in_find_mode(self):
+        return isinstance(self.get_current_root(), _Q_Root_Node)
+
 
 class PageTree(wx.Panel):
     def __init__(self, parent):
         super().__init__(parent)
         sz = wx.BoxSizer(wx.VERTICAL)
         self.tree_search = wx.SearchCtrl(self, size=wx.Size(-1, 25))
-        menu = wx.Menu()
+        self.mode = "all"
+        self.menu = wx.Menu()
+        menu = self.menu
         item = menu.AppendRadioItem(1, "Искать все")
         item.Check(True)
         item = menu.AppendRadioItem(2, "Только Регионы")
         item = menu.AppendRadioItem(3, "Только Горные массивы")
         item = menu.AppendRadioItem(4, "Только Месторождения")
+        item = menu.AppendRadioItem(4, "Только Горизонты")
+        item = menu.AppendRadioItem(4, "Только Выработки")
         item = menu.AppendRadioItem(5, "Только Станции")
         item = menu.AppendRadioItem(6, "Только Скважины")
         self.tree_search.SetMenu(menu)
+        self.tree_search.Bind(wx.EVT_SEARCH, self.on_search)
+        self.tree_search.Bind(wx.EVT_KEY_DOWN, self.on_key)
+        menu.Bind(wx.EVT_MENU, self.on_mode_changed)
         self.tree_search.SetDescriptiveText("Введите часть названия")
         sz.Add(self.tree_search, 0, wx.EXPAND)
         self.tree = _TreeWidget(self)
         sz.Add(self.tree, 1, wx.EXPAND)
         self.SetSizer(sz)
         self.Layout()
+        self.SetFocus()
+
+    def on_key(self, event):
+        key_code = event.GetKeyCode()
+
+        # Проверка нажатия клавиши ESC (код клавиши ESC: 27)
+        if key_code == wx.WXK_ESCAPE:
+            if self.tree.is_in_find_mode():
+                self.tree.end_find()
+                self.tree_search.SetValue("")
+
+        event.Skip()
+
+    def on_mode_changed(self, event):
+        _id = event.GetId()
+        modes = ["all", "region", "rocks", "fields", "horizons", "excavations", "stations", "bore_holes"]
+        self.mode = modes[_id - 1]
+
+    def on_search(self, event):
+        q = self.tree_search.GetValue()
+        print(q)
+        if len(q.strip()) == 0:
+            if self.tree.is_in_find_mode():
+                self.tree.end_find()
+        else:
+            self.tree.start_find(self.tree_search.GetValue(), self.mode)
 
     def get_name(self):
         return "Дерево"
