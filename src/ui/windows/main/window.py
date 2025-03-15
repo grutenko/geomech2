@@ -22,8 +22,10 @@ from src.ui.page import EVT_PAGE_HDR_CHANGED
 from src.ui.windows.login import LoginDialog
 from src.ui.windows.settings.window import SettingsWindow
 
-from .actions import ID_CHANGE_CREDENTIALS, ID_OPEN_DISCHARGE, ID_OPEN_FMS_TREE, ID_OPEN_ROCK_BURST_TREE, ID_OPEN_TREE
+from .actions import ID_CHANGE_CREDENTIALS, ID_OPEN_DISCHARGE, ID_OPEN_DOCUMENTS, ID_OPEN_FMS_TREE, ID_OPEN_ROCK_BURST_TREE, ID_OPEN_TREE
 from .menu import MainMenu
+from .page.document_editor import DocumentEditor
+from .page.documents import Documents
 from .toolbar import MainToolbar
 
 
@@ -87,6 +89,9 @@ class MainWindow(wx.Frame):
         def pm_test_series_editor_def(o=None, is_new=False, parent_object=None):
             return src.fms.ui.page.test_series_editor.PmTestSeriesEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
+        def documents_editor_def(o=None, is_new=False, parent_object=None):
+            return DocumentEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
+
         self.page_def = {
             "tree": lambda **kwds: src.objects.ui.page.tree.PageTree(self.notebook),
             "fms_tree": lambda **kwds: src.fms.ui.page.tree.TreePage(self.notebook),
@@ -99,6 +104,8 @@ class MainWindow(wx.Frame):
             "station_editor": station_editor_def,
             "bore_hole_editor": bore_hole_editor_def,
             "test_series_editor": test_series_editor_def,
+            "documents_list": lambda **kwds: Documents(self.notebook),
+            "document_editor": documents_editor_def,
         }
 
         # Функции должны возвращать true если наборы аргументов соответствуют друг другу,
@@ -124,6 +131,8 @@ class MainWindow(wx.Frame):
             "pm_sample_set_editor": base_args_cmp,
             "test_series_editor": base_args_cmp,
             "pm_test_series_editor": base_args_cmp,
+            "documents_list": lambda args0, args1: True,
+            "document_editor": base_args_cmp,
         }
         self.pages = []
 
@@ -139,6 +148,7 @@ class MainWindow(wx.Frame):
         self.toolbar.Bind(wx.EVT_TOOL, self.on_toggle_fms_tree, id=ID_OPEN_FMS_TREE)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_rock_bursts, id=ID_OPEN_ROCK_BURST_TREE)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_discharge_list, id=ID_OPEN_DISCHARGE)
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_open_documents, id=ID_OPEN_DOCUMENTS)
         self.menu.Bind(wx.EVT_MENU, self.on_close_tab, id=wx.ID_CLOSE)
         self.menu.Bind(wx.EVT_MENU, self.on_next_tab, id=wx.ID_PREVIEW_NEXT)
         self.menu.Bind(wx.EVT_MENU, self.on_prev_tab, id=wx.ID_PREVIEW_PREVIOUS)
@@ -165,6 +175,13 @@ class MainWindow(wx.Frame):
         _ctx = self.find_ctx_by_code("fms_tree")
         if _ctx is None:
             self.open("fms_tree")
+        else:
+            self.close(_ctx.o)
+
+    def on_open_documents(self, event):
+        _ctx = self.find_ctx_by_code("documents_list")
+        if _ctx is None:
+            self.open("documents_list")
         else:
             self.close(_ctx.o)
 
@@ -278,6 +295,7 @@ class MainWindow(wx.Frame):
         self.toolbar.ToggleTool(ID_OPEN_FMS_TREE, self.find_ctx_by_code("fms_tree") is not None)
         self.toolbar.ToggleTool(ID_OPEN_ROCK_BURST_TREE, self.find_ctx_by_code("rock_burst_list") is not None)
         self.toolbar.ToggleTool(ID_OPEN_DISCHARGE, self.find_ctx_by_code("discharge_list") is not None)
+        self.toolbar.ToggleTool(ID_OPEN_DOCUMENTS, self.find_ctx_by_code("documents_list") is not None)
         self.menu.Enable(wx.ID_CLOSE, self.notebook.GetPageCount() > 0)
         self.menu.Enable(wx.ID_PREVIEW_NEXT, self.notebook.GetPageCount() > 0 and self.notebook.GetSelection() < self.notebook.GetPageCount() - 1)
         self.menu.Enable(wx.ID_PREVIEW_PREVIOUS, self.notebook.GetPageCount() > 0 and self.notebook.GetSelection() > 0)
