@@ -24,7 +24,7 @@ class BuildExecutable(build_py):
             "--hidden-import=pony.orm.dbproviders.postgres",
             "--hidden-import=psycopg2",
             "--hidden-import=transliterate",
-            "--hidden-import=transliterate.contrib.languages",
+            "--collect-all=transliterate",
             "--optimize=2",
         ]
         if sys.platform != "win32":

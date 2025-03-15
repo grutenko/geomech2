@@ -6,6 +6,10 @@ import wx.aui
 from pony.orm import db_session
 
 import src.bore_hole.ui.page.bore_hole_editor
+import src.discharge.ui.page.list
+import src.discharge.ui.page.test_series_editor
+import src.fms.ui.page.sample_set_editor
+import src.fms.ui.page.test_series_editor
 import src.fms.ui.page.tree
 import src.mine_object.ui.page.mine_object_editor
 import src.objects.ui.page.tree
@@ -16,8 +20,9 @@ from src.ctx import app_ctx
 from src.ui.icon import get_icon
 from src.ui.page import EVT_PAGE_HDR_CHANGED
 from src.ui.windows.login import LoginDialog
+from src.ui.windows.settings.window import SettingsWindow
 
-from .actions import ID_CHANGE_CREDENTIALS, ID_OPEN_FMS_TREE, ID_OPEN_ROCK_BURST_TREE, ID_OPEN_TREE
+from .actions import ID_CHANGE_CREDENTIALS, ID_OPEN_DISCHARGE, ID_OPEN_FMS_TREE, ID_OPEN_ROCK_BURST_TREE, ID_OPEN_TREE
 from .menu import MainMenu
 from .toolbar import MainToolbar
 
@@ -73,14 +78,27 @@ class MainWindow(wx.Frame):
         def rock_burst_editor_def(o=None, is_new=False, parent_object=None):
             return src.rock_burst.ui.page.editor.RockBurstEditor(self.notebook, o=o, is_new=is_new, parent_object=parent_object)
 
+        def pm_sample_set_editor_def(o=None, is_new=False, parent_object=None):
+            return src.fms.ui.page.sample_set_editor.PmSampleSetEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
+
+        def test_series_editor_def(o=None, is_new=False, parent_object=None):
+            return src.discharge.ui.page.test_series_editor.TestSeriesEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
+
+        def pm_test_series_editor_def(o=None, is_new=False, parent_object=None):
+            return src.fms.ui.page.test_series_editor.PmTestSeriesEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
+
         self.page_def = {
             "tree": lambda **kwds: src.objects.ui.page.tree.PageTree(self.notebook),
             "fms_tree": lambda **kwds: src.fms.ui.page.tree.TreePage(self.notebook),
             "rock_burst_list": lambda **kwds: src.rock_burst.ui.page.list.RockBurstWidget(self.notebook),
+            "discharge_list": lambda **kwds: src.discharge.ui.page.list.DischargeList(self.notebook),
+            "pm_sample_set_editor": pm_sample_set_editor_def,
+            "pm_test_series_editor": pm_test_series_editor_def,
             "rock_burst_editor": rock_burst_editor_def,
             "mine_object_editor": mine_object_editor_def,
             "station_editor": station_editor_def,
             "bore_hole_editor": bore_hole_editor_def,
+            "test_series_editor": test_series_editor_def,
         }
 
         # Функции должны возвращать true если наборы аргументов соответствуют друг другу,
@@ -96,15 +114,21 @@ class MainWindow(wx.Frame):
 
         self.page_cmp_args = {
             "tree": lambda args0, args1: True,
+            "fms_tree": lambda args0, args1: True,
+            "discharge_list": lambda args0, args1: True,
             "mine_object_editor": base_args_cmp,
             "rock_burst_editor": base_args_cmp,
             "station_editor": base_args_cmp,
             "bore_hole_editor": base_args_cmp,
             "rock_burst_list": lambda args0, args1: True,
+            "pm_sample_set_editor": base_args_cmp,
+            "test_series_editor": base_args_cmp,
+            "pm_test_series_editor": base_args_cmp,
         }
         self.pages = []
 
         self.bind_all()
+        self.setttings_wnd = SettingsWindow(self)
 
     def bind_all(self):
         self.notebook.Bind(wx.aui.EVT_AUINOTEBOOK_PAGE_CLOSE, self.on_page_close)
@@ -114,32 +138,32 @@ class MainWindow(wx.Frame):
         self.toolbar.Bind(wx.EVT_TOOL, self.on_toggle_tree, id=ID_OPEN_TREE)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_toggle_fms_tree, id=ID_OPEN_FMS_TREE)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_rock_bursts, id=ID_OPEN_ROCK_BURST_TREE)
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_open_discharge_list, id=ID_OPEN_DISCHARGE)
         self.menu.Bind(wx.EVT_MENU, self.on_close_tab, id=wx.ID_CLOSE)
         self.menu.Bind(wx.EVT_MENU, self.on_next_tab, id=wx.ID_PREVIEW_NEXT)
         self.menu.Bind(wx.EVT_MENU, self.on_prev_tab, id=wx.ID_PREVIEW_PREVIOUS)
+        self.menu.Bind(wx.EVT_MENU, self.on_open_settings, id=wx.ID_PROPERTIES)
+
+    def on_open_settings(self, event):
+        self.setttings_wnd.ShowWindowModal()
+
+    def on_open_discharge_list(self, event):
+        _ctx = self.find_ctx_by_code("discharge_list")
+        if _ctx is None:
+            self.open("discharge_list")
+        else:
+            self.close(_ctx.o)
 
     def on_open_rock_bursts(self, event):
-        _finded = False
-        _ctx = None
-        for ctx in self.pages:
-            if ctx.code == "rock_burst_list":
-                _finded = True
-                _ctx = ctx
-                break
-        if not _finded:
+        _ctx = self.find_ctx_by_code("rock_burst_list")
+        if _ctx is None:
             self.open("rock_burst_list")
         else:
             self.close(_ctx.o)
 
     def on_toggle_fms_tree(self, event):
-        _finded = False
-        _ctx = None
-        for ctx in self.pages:
-            if ctx.code == "fms_tree":
-                _finded = True
-                _ctx = ctx
-                break
-        if not _finded:
+        _ctx = self.find_ctx_by_code("fms_tree")
+        if _ctx is None:
             self.open("fms_tree")
         else:
             self.close(_ctx.o)
@@ -161,14 +185,8 @@ class MainWindow(wx.Frame):
             self.close(self.notebook.GetPage(index))
 
     def on_toggle_tree(self, event):
-        _finded = False
-        _ctx = None
-        for ctx in self.pages:
-            if ctx.code == "tree":
-                _finded = True
-                _ctx = ctx
-                break
-        if not _finded:
+        _ctx = self.find_ctx_by_code("tree")
+        if _ctx is None:
             self.open("tree")
         else:
             self.close(_ctx.o)
@@ -178,13 +196,25 @@ class MainWindow(wx.Frame):
         if dlg.ShowModal() == wx.ID_OK:
             wx.MessageBox("Изменения вступят в силу после перезагрузки", "Доступы изменены", wx.OK | wx.ICON_INFORMATION)
 
-    def on_page_header_changed(self, event):
+    def find_ctx_by_code(self, code):
+        _ctx = None
+        for ctx in self.pages:
+            if ctx.code == code:
+                _ctx = ctx
+                break
+        return _ctx
+
+    def find_index_by_instance(self, wnd):
         _index = -1
         for index in range(self.notebook.GetPageCount()):
             _wnd = self.notebook.GetPage(index)
-            if event.target == _wnd:
+            if wnd == _wnd:
                 _index = index
                 break
+        return _index
+
+    def on_page_header_changed(self, event):
+        _index = self.find_index_by_instance(event.target)
         if _index != -1:
             self.apply_page_header(_index, event.target)
 
@@ -244,24 +274,10 @@ class MainWindow(wx.Frame):
             wx.PostEvent(self.notebook, close_event)  # Генерируем событие вручную
 
     def update_controls_state(self):
-        _finded = False
-        for ctx in self.pages:
-            if ctx.code == "tree":
-                _finded = True
-                break
-        self.toolbar.ToggleTool(ID_OPEN_TREE, _finded)
-        _finded = False
-        for ctx in self.pages:
-            if ctx.code == "fms_tree":
-                _finded = True
-                break
-        self.toolbar.ToggleTool(ID_OPEN_FMS_TREE, _finded)
-        _finded = False
-        for ctx in self.pages:
-            if ctx.code == "rock_burst_list":
-                _finded = True
-                break
-        self.toolbar.ToggleTool(ID_OPEN_ROCK_BURST_TREE, _finded)
+        self.toolbar.ToggleTool(ID_OPEN_TREE, self.find_ctx_by_code("tree") is not None)
+        self.toolbar.ToggleTool(ID_OPEN_FMS_TREE, self.find_ctx_by_code("fms_tree") is not None)
+        self.toolbar.ToggleTool(ID_OPEN_ROCK_BURST_TREE, self.find_ctx_by_code("rock_burst_list") is not None)
+        self.toolbar.ToggleTool(ID_OPEN_DISCHARGE, self.find_ctx_by_code("discharge_list") is not None)
         self.menu.Enable(wx.ID_CLOSE, self.notebook.GetPageCount() > 0)
         self.menu.Enable(wx.ID_PREVIEW_NEXT, self.notebook.GetPageCount() > 0 and self.notebook.GetSelection() < self.notebook.GetPageCount() - 1)
         self.menu.Enable(wx.ID_PREVIEW_PREVIOUS, self.notebook.GetPageCount() > 0 and self.notebook.GetSelection() > 0)

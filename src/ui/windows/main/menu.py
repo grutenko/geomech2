@@ -29,6 +29,7 @@ class MainMenu(wx.MenuBar):
         m = wx.Menu()
         self.Append(m, "Вид")
         m = wx.Menu()
+        m.Append(wx.ID_PROPERTIES, "Открыть настройки")
         self.Append(m, "Настройки")
         m = wx.Menu()
         self.Append(m, "Помощь")

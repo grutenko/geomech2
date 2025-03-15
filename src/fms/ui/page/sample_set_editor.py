@@ -3,7 +3,7 @@ import wx
 from src.ui.icon import get_icon
 
 
-class TestSeriesEditor(wx.Panel):
+class PmSampleSetEditor(wx.Panel):
     def __init__(self, parent, is_new=False, o=None, parent_object=None):
         self.is_new = is_new
         self.o = o
@@ -16,7 +16,7 @@ class TestSeriesEditor(wx.Panel):
     def get_name(self):
         if self.is_new:
             return "(новый)"
-        return self.o.get_tree_name()
+        return "[Проба] " + self.o.Name
 
     def get_icon(self):
         return get_icon("file")
