@@ -59,7 +59,7 @@ class MainWindow(wx.Frame):
 
         self.mgr = wx.aui.AuiManager(p)
         self.notebook = wx.aui.AuiNotebook(p, style=wx.aui.AUI_NB_DEFAULT_STYLE | wx.aui.AUI_NB_WINDOWLIST_BUTTON)
-        self.notebook.SetSelectedFont(wx.Font(wx.FontInfo(10).Italic()))
+        self.notebook.SetSelectedFont(wx.Font(wx.FontInfo(9).Italic()))
         self.mgr.AddPane(self.notebook, wx.aui.AuiPaneInfo().CenterPane())
         self.mgr.Update()
 
