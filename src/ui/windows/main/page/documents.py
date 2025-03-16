@@ -1,3 +1,4 @@
+import pubsub.pub
 import wx
 import wx.lib.mixins.listctrl as listmix
 from pony.orm import db_session, desc, select
@@ -24,7 +25,8 @@ class Documents(wx.Panel, listmix.ColumnSorterMixin):
         item.Enable(False)
         self.toolbar.Realize()
         main_sizer.Add(self.toolbar, 0, wx.EXPAND)
-
+        self.tree_search = wx.SearchCtrl(self, size=wx.Size(-1, 25))
+        main_sizer.Add(self.tree_search, 0, wx.EXPAND)
         self._items = []
         self.itemDataMap = {}
 
@@ -42,8 +44,22 @@ class Documents(wx.Panel, listmix.ColumnSorterMixin):
         self._list.Bind(wx.EVT_RIGHT_DOWN, self._on_right_click)
         self._list.Bind(wx.EVT_LIST_ITEM_SELECTED, self._on_item_sel_changed)
         self._list.Bind(wx.EVT_LIST_ITEM_DESELECTED, self._on_item_sel_changed)
-
+        self._list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_activated)
+        pubsub.pub.subscribe(self.on_objects_changed, "object.added")
+        pubsub.pub.subscribe(self.on_objects_changed, "object.updated")
+        self.Bind(wx.EVT_CLOSE, self.on_close)
         self._load()
+
+    def on_close(self, event):
+        pubsub.pub.unsubscribe(self.on_objects_changed, "object.added")
+        pubsub.pub.unsubscribe(self.on_objects_changed, "object.updated")
+
+    def on_objects_changed(self, o):
+        if isinstance(o, FoundationDocument):
+            self._load()
+
+    def on_activated(self, event):
+        self._on_edit(event)
 
     def _on_item_sel_changed(self, event):
         self._update_controls_state()

@@ -333,6 +333,7 @@ class SuppliedDataWidget(wx.Panel):
 
         self.toolbar = wx.ToolBar(self, style=wx.TB_FLAT)
         item = self.toolbar.AddTool(wx.ID_ADD, "Добавить раздел", get_icon("folder-add"))
+        self.toolbar.EnableTool(wx.ID_ADD, False)
         self.toolbar.Bind(wx.EVT_TOOL, self._on_create_folder, item)
         item = self.toolbar.AddTool(wx.ID_FILE, "Добавить файл", get_icon("file-add"))
         self.toolbar.AddStretchableSpace()
@@ -476,6 +477,7 @@ class SuppliedDataWidget(wx.Panel):
         self.list.Show()
         self._render()
         self.statusbar.SetStatusText(o.get_tree_name())
+        self.toolbar.EnableTool(wx.ID_ADD, True)
         self.Layout()
 
     def end(self):
