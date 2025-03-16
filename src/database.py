@@ -9,6 +9,11 @@ def connect(login: str, password: str, host: str, port: int = 5432, database: st
     db.generate_mapping(create_tables=False)
 
 
+def is_entity(o: object) -> bool:
+    global db
+    return isinstance(o, db)
+
+
 class MineObject(db.Entity):
     _table_ = "MineObjects"
 

@@ -127,3 +127,6 @@ class RockBurstWidget(wx.Panel, listmix.ColumnSorterMixin):
 
     def get_icon(self):
         return get_icon("folder")
+
+    def serialize(self):
+        return {}

@@ -909,3 +909,6 @@ class PageTree(wx.Panel):
 
     def get_icon(self):
         return get_icon("hierarchy")
+
+    def serialize(self):
+        return {}

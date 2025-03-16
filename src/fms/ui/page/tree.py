@@ -122,3 +122,6 @@ class TreePage(wx.Panel):
     def on_edit(self, event): ...
 
     def on_delete(self, event): ...
+
+    def serialize(self):
+        return {}

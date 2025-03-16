@@ -17,6 +17,7 @@ import src.rock_burst.ui.page.editor
 import src.rock_burst.ui.page.list
 import src.station.ui.page.station_editor
 from src.ctx import app_ctx
+from src.database import is_entity
 from src.ui.icon import get_icon
 from src.ui.page import EVT_PAGE_HDR_CHANGED
 from src.ui.windows.login import LoginDialog
@@ -35,6 +36,22 @@ class PageCtx:
     code: str
     o: object
     kwds: Dict[str, object] = field(default_factory=lambda: {})
+
+    def serialize_allowed(self) -> bool:
+        return hasattr(self.o, "serialize")
+
+    def serialize(self):
+        if not self.serialize_allowed():
+            return None
+        data = {"code": self.code, "o": self.o.serialize()}
+        kwds = {}
+        for key, value in self.kwds:
+            if is_entity(value):
+                kwds[key] = {"type": "entity", "class": value.__class__.__name__, "id": value.RID}
+            else:
+                kwds[key] = value
+        data["kwds"] = kwds
+        return data
 
 
 class MainWindow(wx.Frame):
@@ -138,6 +155,11 @@ class MainWindow(wx.Frame):
 
         self.bind_all()
         self.setttings_wnd = SettingsWindow(self)
+        self.Bind(wx.EVT_CLOSE, self.on_close)
+
+    def on_close(self, event):
+        wx.Exit()
+        event.Skip()
 
     def bind_all(self):
         self.notebook.Bind(wx.aui.EVT_AUINOTEBOOK_PAGE_CLOSE, self.on_page_close)
