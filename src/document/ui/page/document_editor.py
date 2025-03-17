@@ -1,6 +1,6 @@
 import pubsub.pub
 import wx
-from pony.orm import commit, db_session, select
+from pony.orm import commit, db_session
 
 from src.ctx import app_ctx
 from src.database import FoundationDocument

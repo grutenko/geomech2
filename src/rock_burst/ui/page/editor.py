@@ -150,10 +150,10 @@ class RockBurstEditor(wx.Panel):
         self.load_causes()
         self.load_signs()
 
-    def on_close(self, event):
+    def on_close(self):
         unsubscribe(self.on_object_changed, "object.added")
         unsubscribe(self.on_object_changed, "object.deleted")
-        event.Skip()
+        return True
 
     def get_name(self):
         if self.is_new:

@@ -23,8 +23,9 @@ class EntityList(wx.Panel):
         for code, (name, converter, width) in self.columns.items():
             self.list.AppendColumn(name, width=width)
         sz.Add(self.list, 1, wx.EXPAND)
+        self.statusbar = wx.StatusBar(self)
+        sz.Add(self.statusbar, 0, wx.EXPAND)
         self.SetSizer(sz)
-        self.Layout()
         self.items = []
         self.load()
 

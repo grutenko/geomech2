@@ -18,6 +18,8 @@ import src.rock_burst.ui.page.list
 import src.station.ui.page.station_editor
 from src.ctx import app_ctx
 from src.database import is_entity
+from src.document.ui.page.document_editor import DocumentEditor
+from src.document.ui.page.documents import Documents
 from src.ui.icon import get_icon
 from src.ui.page import EVT_PAGE_HDR_CHANGED
 from src.ui.windows.login import LoginDialog
@@ -25,8 +27,6 @@ from src.ui.windows.settings.window import SettingsWindow
 
 from .actions import ID_CHANGE_CREDENTIALS, ID_OPEN_DISCHARGE, ID_OPEN_DOCUMENTS, ID_OPEN_FMS_TREE, ID_OPEN_ROCK_BURST_TREE, ID_OPEN_TREE
 from .menu import MainMenu
-from .page.document_editor import DocumentEditor
-from .page.documents import Documents
 from .toolbar import MainToolbar
 
 
@@ -57,7 +57,7 @@ class PageCtx:
 class MainWindow(wx.Frame):
     @db_session
     def __init__(self):
-        super().__init__(None, title="База данных геомеханики", size=wx.Size(1280, 550))
+        super().__init__(None, title="База данных геомеханики", size=wx.Size(600, 580))
         self.CenterOnScreen()
         self.SetIcon(wx.Icon(get_icon("logo")))
 
@@ -158,6 +158,8 @@ class MainWindow(wx.Frame):
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
     def on_close(self, event):
+        self.setttings_wnd.Close()
+        self.setttings_wnd.Destroy()
         wx.Exit()
         event.Skip()
 
@@ -208,7 +210,19 @@ class MainWindow(wx.Frame):
             self.close(_ctx.o)
 
     def on_page_changed(self, event):
+        selected_index = event.GetSelection()
+        deselected_index = event.GetOldSelection()
+        if selected_index != -1:
+            new_wnd = self.notebook.GetPage(selected_index)
+            if new_wnd is not None:
+                if hasattr(new_wnd, "on_select"):
+                    new_wnd.on_select()
         self.update_controls_state()
+        if deselected_index != -1:
+            old_wnd = self.notebook.GetPage(deselected_index)
+            if old_wnd is not None:
+                if hasattr(old_wnd, "on_deselect"):
+                    old_wnd.on_deselect()
 
     def on_next_tab(self, event):
         if self.notebook.GetSelection() < self.notebook.GetPageCount() - 1:
@@ -268,7 +282,14 @@ class MainWindow(wx.Frame):
         if page_index == wx.NOT_FOUND:
             return
         wnd = self.notebook.GetPage(page_index)
-        # TODO: Добавить отправку события EVT_CLOSE на страницу для возможности Veto()
+        apply = True
+        if hasattr(wnd, "on_close"):
+            apply = wnd.on_close()
+        if not apply:
+            event.Veto()
+            return
+        if hasattr(wnd, "on_deselect"):
+            wnd.on_deselect()
         for index, ctx in enumerate(self.pages):
             if ctx.o == wnd:
                 self.pages.__delitem__(index)

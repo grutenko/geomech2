@@ -7,7 +7,8 @@ from .entity_list import EntityList
 
 class RcTypicalSigns(EntityList):
     def __init__(self, parent):
-        super().__init__(parent, {}, RBTypicalSign)
+        columns = {"Name": ("Название", lambda: ..., 250), "Comment": ("Комментарий", lambda: ..., 350)}
+        super().__init__(parent, columns, RBTypicalSign)
         self.Hide()
 
     def start(self):

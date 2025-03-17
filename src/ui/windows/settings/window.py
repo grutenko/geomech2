@@ -3,7 +3,7 @@ import wx
 from src.ui.icon import get_icon
 
 from .coord_systems import CoordSystems
-from .petrotype_struct import PetrotypeStruct
+from .petrotype_struct import PetrotypeStructList
 from .pm_equipments import PmEquipments
 from .pm_methods import PmMethods
 from .pm_properties import PmProperties
@@ -57,20 +57,21 @@ class SettingsWindow(wx.Dialog):
         self.tree.AppendItem(p, "Типы событий", image=self.file_icon, data="rb_types")
         p = self.tree.AppendItem(r, "Петротипы", image=self.file_icon, data="petrotype_struct")
         p = self.tree.AppendItem(r, "Системы координат", image=self.file_icon, data="coord_systems")
+        self.tree.ExpandAll()
         self.right = wx.Panel(self.splitter)
         self.right_sizer = wx.BoxSizer(wx.VERTICAL)
         self.deputy = Deputy(self.right)
         self.right_sizer.Add(self.deputy, 1, wx.EXPAND)
-        self.deputy.Show()
+        self.deputy.start()
         self.right.SetSizer(self.right_sizer)
         self.splitter.SplitVertically(self.tree, self.right, 200)
-        self.splitter.SetMinimumPaneSize(200)
-        sz.Add(self.splitter)
+        self.splitter.SetMinimumPaneSize(150)
+        sz.Add(self.splitter, 1, wx.EXPAND)
         self.Layout()
         self.CenterOnScreen()
         self.panels = {
             "coord_systems": CoordSystems(self.right),
-            "petrotype_struct": PetrotypeStruct(self.right),
+            "petrotype_struct": PetrotypeStructList(self.right),
             "pm_equipments": PmEquipments(self.right),
             "pm_methods": PmMethods(self.right),
             "pm_properties": PmProperties(self.right),
@@ -83,12 +84,15 @@ class SettingsWindow(wx.Dialog):
         }
         self.started = False
         self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_select)
+        self.sash_hack = +1
 
     def on_select(self, event):
-        item_id = self.tree.GetSelection()
+        try:
+            item_id = self.tree.GetSelection()
+        except Exception:
+            return
         if item_id.IsOk():
             data = self.tree.GetItemData(item_id)
-            print(data)
             if data is not None:
                 self.start(data)
             else:
@@ -101,8 +105,11 @@ class SettingsWindow(wx.Dialog):
         new_wnd = self.panels[panel_code]
         self.right_sizer.Add(new_wnd, 1, wx.EXPAND)
         new_wnd.start()
+        self.sash_hack *= -1
+        self.splitter.SetSashPosition(self.splitter.GetSashPosition() + int(self.sash_hack))
         new_wnd.Layout()
         self.Layout()
+        self.Update()
 
     def end(self):
         wnd = self.right_sizer.GetItem(0).GetWindow()

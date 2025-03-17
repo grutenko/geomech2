@@ -20,6 +20,20 @@ class DischargeList(wx.Panel, listmix.ColumnSorterMixin):
         self.itemDataMap = {}
 
         main_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.toolbar = wx.ToolBar(self, style=wx.TB_FLAT | wx.TB_HORZ_TEXT)
+        self.toolbar.AddTool(wx.ID_ADD, "Добавить", get_icon("file-add"))
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_add, id=wx.ID_ADD)
+        self.toolbar.AddSeparator()
+        self.toolbar.AddTool(wx.ID_EDIT, "Изменить", get_icon("edit"))
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_edit, id=wx.ID_EDIT)
+        self.toolbar.AddTool(wx.ID_DELETE, "Удалить", get_icon("delete"))
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_delete, id=wx.ID_DELETE)
+        self.toolbar.EnableTool(wx.ID_EDIT, False)
+        self.toolbar.EnableTool(wx.ID_DELETE, False)
+        self.toolbar.Realize()
+        main_sizer.Add(self.toolbar, 0, wx.EXPAND)
+        self.tree_search = wx.SearchCtrl(self, size=wx.Size(-1, 25))
+        main_sizer.Add(self.tree_search, 0, wx.EXPAND)
         self._image_list = wx.ImageList(16, 16)
         self._book_stack_icon = self._image_list.Add(get_icon("read"))
         self._list = wx.ListCtrl(self, style=wx.LC_REPORT)
@@ -37,6 +51,12 @@ class DischargeList(wx.Panel, listmix.ColumnSorterMixin):
         self._load()
         self._bind_all()
         self._silence_select = False
+
+    def on_add(self, event): ...
+
+    def on_edit(self, event): ...
+
+    def on_delete(self, event): ...
 
     def _bind_all(self):
         self._list.Bind(wx.EVT_RIGHT_DOWN, self._on_right_click)

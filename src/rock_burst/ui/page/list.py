@@ -33,6 +33,8 @@ class RockBurstWidget(wx.Panel, listmix.ColumnSorterMixin):
         self.toolbar.EnableTool(wx.ID_DELETE, False)
         self.toolbar.Realize()
         sz.Add(self.toolbar, 0, wx.EXPAND)
+        self.search = wx.SearchCtrl(self)
+        sz.Add(self.search, 0, wx.EXPAND)
         self.image_list = wx.ImageList(16, 16)
         self.list = wx.ListCtrl(self, style=wx.LC_REPORT)
         self.list.AppendColumn("№", width=50)

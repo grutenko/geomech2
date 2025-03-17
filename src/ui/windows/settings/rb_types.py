@@ -7,7 +7,8 @@ from .entity_list import EntityList
 
 class RbTypes(EntityList):
     def __init__(self, parent):
-        super().__init__(parent, {}, RBType)
+        columns = {"Name": ("Название", lambda: ..., 250), "Comment": ("Комментарий", lambda: ..., 350)}
+        super().__init__(parent, columns, RBType)
         self.Hide()
 
     def start(self):

@@ -47,12 +47,12 @@ class Documents(wx.Panel, listmix.ColumnSorterMixin):
         self._list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_activated)
         pubsub.pub.subscribe(self.on_objects_changed, "object.added")
         pubsub.pub.subscribe(self.on_objects_changed, "object.updated")
-        self.Bind(wx.EVT_CLOSE, self.on_close)
         self._load()
 
-    def on_close(self, event):
+    def on_close(self):
         pubsub.pub.unsubscribe(self.on_objects_changed, "object.added")
         pubsub.pub.unsubscribe(self.on_objects_changed, "object.updated")
+        return True
 
     def on_objects_changed(self, o):
         if isinstance(o, FoundationDocument):
@@ -112,8 +112,8 @@ class Documents(wx.Panel, listmix.ColumnSorterMixin):
         self.Hide()
 
     def _on_node_selection_changed(self, event):
-        self._menu_bar.Enable(wx.ID_EDIT, event.node != None)
-        self._menu_bar.Enable(wx.ID_DELETE, event.node != None)
+        self._menu_bar.Enable(wx.ID_EDIT, event.node is not None)
+        self._menu_bar.Enable(wx.ID_DELETE, event.node is not None)
 
     def _on_create(self, event):
         app_ctx().main.open("document_editor", is_new=True)

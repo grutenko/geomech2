@@ -643,7 +643,6 @@ class _TreeWidget(TreeWidget):
         self._mode = mode
 
     def _create_object(self, parent_object, instance_class):
-        window = wx.GetApp().GetTopWindow().FindFocus().GetTopLevelParent()
         if instance_class == MineObject:
             app_ctx().main.open("mine_object_editor", is_new=True, o=None, parent_object=parent_object)
         elif instance_class == Station:
@@ -849,6 +848,9 @@ class _TreeWidget(TreeWidget):
     def is_in_find_mode(self):
         return isinstance(self.get_current_root(), _Q_Root_Node)
 
+    def unbind_pubsub(self):
+        pubsub.pub.unsubscribe(self.on_objects_changed, "object.added")
+
 
 class PageTree(wx.Panel):
     def __init__(self, parent):
@@ -912,3 +914,7 @@ class PageTree(wx.Panel):
 
     def serialize(self):
         return {}
+
+    def on_close(self):
+        self.tree.unbind_pubsub()
+        return True
