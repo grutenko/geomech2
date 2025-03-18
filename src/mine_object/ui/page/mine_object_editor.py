@@ -24,7 +24,7 @@ class MineObjectEditor(wx.Panel):
         self.toolbar.Realize()
         sz.Add(self.toolbar, 0, wx.EXPAND)
         self.splitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)
-        self.left = wx.Panel(self.splitter)
+        self.left = wx.ScrolledWindow(self.splitter, style=wx.VSCROLL)
         left_sz = wx.BoxSizer(wx.VERTICAL)
         left_sz_in = wx.BoxSizer(wx.VERTICAL)
 
@@ -52,6 +52,8 @@ class MineObjectEditor(wx.Panel):
 
         left_sz.Add(left_sz_in, 1, wx.EXPAND | wx.ALL, border=10)
         self.left.SetSizer(left_sz)
+        self.left.SetVirtualSize(self.left.GetBestSize() + (250, 250))
+        self.left.SetScrollRate(10, 10)
 
         self.right = wx.Notebook(self.splitter)
         self.supplied_data = SuppliedDataWidget(self.right, deputy_text="Недоступно для новых объектов. Сначала сохраните.")

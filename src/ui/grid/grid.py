@@ -8,8 +8,9 @@ import wx.grid
 import wx.lib.agw.flatnotebook
 import wx.lib.mixins.gridlabelrenderer
 import wx.lib.newevent
+from wx.grid import GridCellEditor, GridCellRenderer, GridCellStringRenderer, GridCellTextEditor
 
-from src.ui.icon import get_art
+from src.ui.icon import get_art, get_icon
 
 from .col_label_renderer import ColLabelRenderer
 from .find import FindDialog
@@ -72,9 +73,6 @@ class CellType(Protocol):
         ...
 
 
-from wx.grid import GridCellEditor, GridCellRenderer, GridCellStringRenderer, GridCellTextEditor
-
-
 class StringCellType(CellType):
     def __init__(self, multiline=False) -> None:
         super().__init__()
@@ -120,7 +118,7 @@ class StringCellType(CellType):
         return p
 
     def __eq__(self, value: object) -> bool:
-        return type(value) == StringCellType
+        return isinstance(value, StringCellType)
 
 
 class FloatCellType(CellType):
@@ -137,10 +135,10 @@ class FloatCellType(CellType):
     def test_repr(self, value) -> bool:
         ret = True
         try:
-            float_value = float(value)
+            float(value)
         except ValueError:
             try:
-                float_value = float(value.replace(",", "."))
+                float(value.replace(",", "."))
             except ValueError:
                 ret = False
 
@@ -154,13 +152,13 @@ class FloatCellType(CellType):
         except ValueError as e:
             try:
                 float_value = float(value.replace(",", "."))
-            except ValueError as e2:
+            except ValueError:
                 raise e
 
         return float_value
 
     def to_string(self, value) -> str:
-        if value == None:
+        if value is None:
             return ""
         return str(value)
 
@@ -171,7 +169,7 @@ class FloatCellType(CellType):
         return wx.grid.GridCellFloatEditor(precision=self.prec, format=wx.grid.GRID_FLOAT_FORMAT_FIXED)
 
     def __eq__(self, value: object) -> bool:
-        return type(value) == FloatCellType
+        return isinstance(value, FloatCellType)
 
 
 class NumberCellType(CellType):
@@ -187,22 +185,22 @@ class NumberCellType(CellType):
     def test_repr(self, value: str) -> bool:
         ret = True
         try:
-            int_value = int(value)
+            int(value)
         except ValueError:
             try:
-                int_value = int(float(value.replace(",", ".")))
+                int(float(value.replace(",", ".")))
             except ValueError:
                 ret = False
 
         return ret
 
     def from_string(self, value: str):
-        if value == None or len(value.strip()) == 0:
+        if value is None or len(value.strip()) == 0:
             return None
         return int(float(value))
 
     def to_string(self, value) -> str:
-        if value == None:
+        if value is None:
             return "0"
         return str(int(value))
 
@@ -213,7 +211,7 @@ class NumberCellType(CellType):
         return wx.grid.GridCellNumberEditor()
 
     def __eq__(self, value: object) -> bool:
-        return type(value) == NumberCellType
+        return isinstance(value, NumberCellType)
 
 
 @dataclass
@@ -226,10 +224,7 @@ class Column:
     optional: bool = False
 
     def __eq__(self, value: object) -> bool:
-        return type(value) == Column and value.id == self.id
-
-
-from src.ui.icon import get_icon
+        return isinstance(value, Column) and value.id == self.id
 
 
 class CellView(wx.Dialog):
@@ -242,7 +237,7 @@ class CellView(wx.Dialog):
         self._notebook = wx.Notebook(self)
         self._cell_pane = wx.Panel(self._notebook)
         self.cell_pane_inner_panel = column.cell_type.get_cell_props_value_panel(self._cell_pane, value)
-        if self.cell_pane_inner_panel != None:
+        if self.cell_pane_inner_panel is not None:
             sz = wx.BoxSizer(wx.VERTICAL)
             sz.Add(self.cell_pane_inner_panel, 1, wx.EXPAND | wx.ALL, border=10)
             self._cell_pane.SetSizer(sz)
@@ -473,7 +468,6 @@ class GridEditor(wx.Panel):
             "can_paste": False,
             "can_undo": False,
             "can_redo": False,
-            "can_save": False,
             "can_delete_row": False,
             "can_find_next": False,
         }
@@ -518,7 +512,7 @@ class GridEditor(wx.Panel):
         self._render()
 
     def show_errors_view(self, show=True):
-        if show != (self._splitter.GetWindow2() != None):
+        if show != (self._splitter.GetWindow2() is not None):
             self._on_toggle_errors()
             # self.menubar.Check(ID_TOGGLE_ERRORS, show)
 
@@ -763,7 +757,7 @@ class GridEditor(wx.Panel):
 
         self._render_sizing(begin_batch=False)
 
-        if last_cursor_pos != None and self._view.GetNumberCols() > 0 and self._view.GetNumberRows() > 0:
+        if last_cursor_pos is not None and self._view.GetNumberCols() > 0 and self._view.GetNumberRows() > 0:
             cursor_row, cursor_col = last_cursor_pos
 
             if cursor_col >= self._view.GetNumberCols():
@@ -800,7 +794,7 @@ class GridEditor(wx.Panel):
     def _on_change_selected_cell(self, event):
         self._last_cursor_pos = (event.GetRow(), event.GetCol())
         column = self._columns[event.GetCol()]
-        if column.name_long != None:
+        if column.name_long is not None:
             name = column.name_long
         else:
             name = column.name_short
@@ -1059,7 +1053,7 @@ class GridEditor(wx.Panel):
         self._update_controls_state()
 
     def _on_toggle_errors(self, event=None):
-        if self._splitter.GetWindow2() != None:
+        if self._splitter.GetWindow2() is not None:
             self._splitter.Unsplit(None)
         else:
             self._splitter.SplitHorizontally(self._hor_splitter, self._errors_view, -200)
@@ -1111,14 +1105,6 @@ class GridEditor(wx.Panel):
         """
         Update state of all controls (menubar, statusbar, toolbar)
         """
-        blocks_selected = False
-        blocks: wx.grid.GridBlocks = self._view.GetSelectedBlocks()
-        for block in blocks:
-            blocks_selected = True
-            break
-        cursor_row, cursor_col = (self._view.GetGridCursorRow(), self._view.GetGridCursorCol())
-        is_cursor_valid = cursor_row >= 0 and cursor_col >= 0
-        is_cells_selected = is_cursor_valid or blocks_selected
 
         read_only = self._read_only
         global_enable = not self._in_edit_mode
@@ -1153,10 +1139,7 @@ class GridEditor(wx.Panel):
         self.menubar.Enable(ID_ADD_ROW, global_enable)
         self.menubar.Enable(ID_REMOVE_ROW, global_enable and is_rows_selected)
 
-        self.menubar.Check(ID_TOGGLE_ERRORS, self._splitter.GetWindow2() != None)
-
-    def is_changed(self) -> bool:
-        return self._model.have_changes()
+        self.menubar.Check(ID_TOGGLE_ERRORS, self._splitter.GetWindow2() is not None)
 
     def _cmd_append_rows(self, number_rows):
         for i in range(number_rows):
@@ -1282,7 +1265,7 @@ class GridEditor(wx.Panel):
             self._view.SaveEditControlValue()
             self._view.HideCellEditControl()
         errors = self._model.validate()
-        if len(errors) > 0 and self._splitter.GetWindow2() == None:
+        if len(errors) > 0 and self._splitter.GetWindow2() is None:
             self._on_toggle_errors()
             self.menubar.Check(ID_TOGGLE_ERRORS, True)
         self._errors_view.set_errors(errors)
@@ -1291,7 +1274,7 @@ class GridEditor(wx.Panel):
         for column, row, msg in errors:
             try:
                 col_index = ids.index(column.id)
-            except:
+            except Exception:
                 continue
             else:
                 hightlight.append((col_index, row))

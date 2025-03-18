@@ -2,8 +2,13 @@ import dataclasses
 import typing
 
 import wx
+import wx.lib.newevent
 
 from .tree_node import TreeNode
+
+WidgetTreeMenu, EVT_WIDGET_TREE_MENU = wx.lib.newevent.NewEvent()
+WidgetTreeActivated, EVT_WIDGET_TREE_ACTIVATED = wx.lib.newevent.NewEvent()
+WidgetTreeSelChanged, EVT_WIDGET_TREE_SEL_CHANGED = wx.lib.newevent.NewEvent()
 
 
 @dataclasses.dataclass
@@ -16,13 +21,6 @@ class Context:
 @dataclasses.dataclass
 class DeputyContext:
     pass
-
-
-import wx.lib.newevent
-
-WidgetTreeMenu, EVT_WIDGET_TREE_MENU = wx.lib.newevent.NewEvent()
-WidgetTreeActivated, EVT_WIDGET_TREE_ACTIVATED = wx.lib.newevent.NewEvent()
-WidgetTreeSelChanged, EVT_WIDGET_TREE_SEL_CHANGED = wx.lib.newevent.NewEvent()
 
 
 class TreeWidget(wx.Panel):
@@ -61,7 +59,7 @@ class TreeWidget(wx.Panel):
         self._tree.Unbind(wx.EVT_TREE_ITEM_MENU, handler=self._on_native_item_menu)
 
     def set_root_node(self, root_node: TreeNode):
-        if self._root_node != None:
+        if self._root_node is not None:
             self._tree.DeleteAllItems()
         self._root_node = root_node
         self._tree.AddRoot("Объекты")
@@ -72,7 +70,7 @@ class TreeWidget(wx.Panel):
         if depth == 0:
             return None
 
-        p = root_native_item if root_native_item != None else self._tree.GetRootItem()
+        p = root_native_item if root_native_item is not None else self._tree.GetRootItem()
         p_context = self._tree.GetItemData(p)
         if isinstance(p_context, Context) and p_context.node.__eq__(node):
             return p
@@ -84,7 +82,7 @@ class TreeWidget(wx.Panel):
             if isinstance(context, Context) and context.node.__eq__(node):
                 return item
             child_item = self._find_native_item(node, item, depth - 1 if depth != -1 else -1)
-            if child_item != None:
+            if child_item is not None:
                 return child_item
             item = self._tree.GetNextSibling(item)
 
@@ -102,25 +100,25 @@ class TreeWidget(wx.Panel):
             if isinstance(deputy_context, DeputyContext):
                 _item_deputy = first_item
         if len(context.subnodes) > 0:
-            if _item_deputy != None:
+            if _item_deputy is not None:
                 _first_subnode = context.subnodes.pop(0)
                 self._append_node(native_item, _first_subnode, native_item=_item_deputy)
             for subnode in context.subnodes:
                 self._append_node(native_item, subnode)
-            if _item_deputy != None:
+            if _item_deputy is not None:
                 context.subnodes.insert(0, _first_subnode)
         else:
-            if _item_deputy != None:
+            if _item_deputy is not None:
                 wx.CallAfter(self._tree.Delete, _item_deputy)
 
     def select_node(self, node: TreeNode):
-        if node == None:
+        if node is None:
             return
 
         _stack = [node]
         while True:
             _item = self._find_native_item(_stack[0])
-            if _item != None or _stack[0].is_root():
+            if _item is not None or _stack[0].is_root():
                 break
             else:
                 _stack.insert(0, _stack[0].get_parent())
@@ -129,12 +127,12 @@ class TreeWidget(wx.Panel):
         _p_item = None
         for _node in _stack:
             _p_item = self._find_native_item(_node)
-            if _p_item == None:
+            if _p_item is None:
                 return
             self._load_subnodes(_p_item)
 
         _item = self._find_native_item(node)
-        if _item != None:
+        if _item is not None:
             self._synthetic_expand = True
             try:
                 self._tree.SelectItem(_item)
@@ -143,7 +141,7 @@ class TreeWidget(wx.Panel):
 
     def soft_reload_node(self, node: TreeNode):
         item = self._find_native_item(node)
-        if item != None:
+        if item is not None:
             self._soft_reload_native_item(item)
 
     def get_current_node(self):
@@ -162,15 +160,15 @@ class TreeWidget(wx.Panel):
             context.node.self_reload()
             self._tree.SetItemText(native_item, context.node.get_name())
             icon = context.node.get_icon()
-            if icon != None:
+            if icon is not None:
                 self._tree.SetItemImage(native_item, self._apply_icon(icon[0], icon[1]), wx.TreeItemIcon_Normal)
             icon = context.node.get_icon_open()
-            if icon != None:
+            if icon is not None:
                 self._tree.SetItemImage(native_item, self._apply_icon(icon[0], icon[1]), wx.TreeItemIcon_Expanded)
 
     def soft_reload_childrens(self, node: TreeNode):
         item = self._find_native_item(node)
-        if item != None:
+        if item is not None:
             self._soft_reload_native_item_childrens(item)
 
     def _soft_reload_native_item_childrens(self, native_item: wx.TreeItemId):
@@ -185,14 +183,14 @@ class TreeWidget(wx.Panel):
 
                 for index, node in enumerate(subnodes):
                     item = self._find_native_item(node, native_item, 1)
-                    if item == None:
+                    if item is None:
                         self._append_node(native_item, node, index)
 
                 item, cookie = self._tree.GetFirstChild(native_item)
                 i = 0
                 while item.IsOk():
                     context: Context = self._tree.GetItemData(item)
-                    if not context.node in subnodes:
+                    if context.node not in subnodes:
                         _subnodes_to_delete.append(item)
 
                     item = self._tree.GetNextSibling(item)
@@ -209,7 +207,7 @@ class TreeWidget(wx.Panel):
         return self._icons[icon_name]
 
     def _append_node(self, parent_native_item: wx.TreeItemId, node: TreeNode, index=-1, native_item=None):
-        if native_item == None:
+        if native_item is None:
             if index == -1:
                 item = self._tree.AppendItem(parent_native_item, node.get_name(), data=Context(node))
             else:
@@ -221,10 +219,10 @@ class TreeWidget(wx.Panel):
 
         if self._use_icons:
             icon = node.get_icon()
-            if icon != None:
+            if icon is not None:
                 self._tree.SetItemImage(item, self._apply_icon(icon[0], icon[1]))
             icon_open = node.get_icon_open()
-            if icon_open != None:
+            if icon_open is not None:
                 self._tree.SetItemImage(item, self._apply_icon(icon_open[0], icon_open[1]), wx.TreeItemIcon_Expanded)
         if node.is_name_bold():
             self._tree.SetItemBold(item)
@@ -236,7 +234,7 @@ class TreeWidget(wx.Panel):
         if not context.is_subnodes_loaded:
             self._load_subnodes(event.GetItem())
 
-        if self._synthetic_expand == True:
+        if self._synthetic_expand:
             return
 
         item, _ = self._tree.GetFirstChild(event.GetItem())

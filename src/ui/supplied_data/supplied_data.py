@@ -5,15 +5,15 @@ from datetime import datetime
 
 import wx
 import wx.dataview
-from pony.orm import *
+from pony.orm import commit, db_session, select
 from transliterate import translit
 
-from src.database import *
-from src.datetimeutil import *
+from src.database import SuppliedData, SuppliedDataPart
+from src.datetimeutil import decode_date, encode_date
 from src.delete_object import delete_object
 from src.resourcelocation import resource_path
 from src.ui.icon import get_art, get_icon
-from src.ui.validators import *
+from src.ui.validators import DateValidator, TextValidator
 
 
 class FolderEditor(wx.Dialog):
@@ -21,7 +21,7 @@ class FolderEditor(wx.Dialog):
         super().__init__(parent)
         self.CenterOnScreen()
 
-        if o == None:
+        if o is None:
             self.own_id = own_id
             self.own_type = own_type
             self.SetTitle("Добавить раздел")
@@ -72,7 +72,7 @@ class FolderEditor(wx.Dialog):
         top_sizer.Add(line, 0, wx.EXPAND | wx.TOP, border=10)
 
         btn_sizer = wx.StdDialogButtonSizer()
-        if o == None:
+        if o is None:
             label = "Создать"
         else:
             label = "Изменить"
@@ -102,9 +102,9 @@ class FolderEditor(wx.Dialog):
 
     def _apply_fields(self):
         self.field_name.SetValue(self.o.Name)
-        self.field_comment.SetValue(self.o.Comment if self.o.Comment != None else "")
-        self.field_number.SetValue(self.o.Number if self.o.Number != None else "")
-        self.field_data_date.SetValue(str(decode_date(self.o.DataDate)) if self.o.DataDate != None else "")
+        self.field_comment.SetValue(self.o.Comment if self.o.Comment is not None else "")
+        self.field_number.SetValue(self.o.Number if self.o.Number is not None else "")
+        self.field_data_date.SetValue(str(decode_date(self.o.DataDate)) if self.o.DataDate is not None else "")
 
     @db_session
     def _on_save(self, event):
@@ -118,7 +118,7 @@ class FolderEditor(wx.Dialog):
         if len(self.field_data_date.GetValue().strip()) > 0:
             fields["DataDate"] = encode_date(self.field_data_date.GetValue().strip())
 
-        if self.o == None:
+        if self.o is None:
             fields["OwnID"] = self.own_id
             fields["OwnType"] = self.own_type
             o = SuppliedData(**fields)
@@ -163,7 +163,7 @@ class FileEditor(wx.Dialog):
         self.CenterOnScreen()
         self.o = None
         self.p = None
-        if o == None:
+        if o is None:
             self.p = p
             self.SetTitle("Добавить файл")
         else:
@@ -224,7 +224,7 @@ class FileEditor(wx.Dialog):
         self.progress = wx.Gauge(self)
         btn_sizer.Add(self.progress, 1, wx.CENTER | wx.RIGHT, border=10)
 
-        if o == None:
+        if o is None:
             label = "Создать"
         else:
             label = "Изменить"
@@ -274,7 +274,7 @@ class FileEditor(wx.Dialog):
             "data_date": encode_date(self.field_data_date.GetValue()),
         }
         mime_type, _ = mimetypes.guess_type(path)
-        if mime_type != None:
+        if mime_type is not None:
             _fields["mime_type"] = mime_type
         else:
             _fields["mime_type"] = "application/octet-stream"
@@ -459,12 +459,10 @@ class SuppliedDataWidget(wx.Panel):
             self.list.Expand(folder)
 
     def _update_controls_state(self):
-        self.toolbar.EnableTool(wx.ID_ADD, self.o != None)
+        self.toolbar.EnableTool(wx.ID_ADD, self.o is not None)
         item = self.list.GetSelection()
-        item_selected = False
         folder_selected = False
         if item.IsOk():
-            item_selected = True
             folder_selected = isinstance(self.list.GetItemData(item), SuppliedData)
         self.toolbar.EnableTool(wx.ID_FILE, folder_selected)
 

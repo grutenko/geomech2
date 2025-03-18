@@ -30,6 +30,9 @@ class DischargeList(wx.Panel, listmix.ColumnSorterMixin):
         self.toolbar.Bind(wx.EVT_TOOL, self.on_delete, id=wx.ID_DELETE)
         self.toolbar.EnableTool(wx.ID_EDIT, False)
         self.toolbar.EnableTool(wx.ID_DELETE, False)
+        self.toolbar.AddStretchableSpace()
+        self.toolbar.AddTool(wx.ID_REFRESH, "Обновить", get_icon("update"))
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_refresh, id=wx.ID_REFRESH)
         self.toolbar.Realize()
         main_sizer.Add(self.toolbar, 0, wx.EXPAND)
         self.tree_search = wx.SearchCtrl(self, size=wx.Size(-1, 25))
@@ -51,6 +54,9 @@ class DischargeList(wx.Panel, listmix.ColumnSorterMixin):
         self._load()
         self._bind_all()
         self._silence_select = False
+
+    def on_refresh(self, event):
+        self._load()
 
     def on_add(self, event): ...
 

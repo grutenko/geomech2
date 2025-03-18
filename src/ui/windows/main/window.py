@@ -16,6 +16,7 @@ import src.objects.ui.page.tree
 import src.rock_burst.ui.page.editor
 import src.rock_burst.ui.page.list
 import src.station.ui.page.station_editor
+from src.config import flush
 from src.ctx import app_ctx
 from src.database import is_entity
 from src.document.ui.page.document_editor import DocumentEditor
@@ -158,6 +159,13 @@ class MainWindow(wx.Frame):
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
     def on_close(self, event):
+        cfg = app_ctx().config
+        cfg.width = self.GetSize().GetWidth()
+        cfg.height = self.GetSize().GetHeight()
+        cfg.x = self.GetPosition().Get().__getitem__(0)
+        cfg.y = self.GetPosition().Get().__getitem__(1)
+        if not app_ctx().config_is_fallback_runtime:
+            flush(cfg, app_ctx().config_filename)
         self.setttings_wnd.Close()
         self.setttings_wnd.Destroy()
         wx.Exit()
