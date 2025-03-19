@@ -14,7 +14,7 @@ class DocumentEditor(wx.Panel):
     @db_session
     def __init__(self, parent, is_new=False, o=None, parent_object=None):
         self.is_new = is_new
-        self.o = select(o for o in FoundationDocument if o.RID == o.RID) if not is_new else None
+        self.o = select(o for o in FoundationDocument if o.RID == o.RID).first() if not is_new else None
         self.parent_object = parent_object
         super().__init__(parent)
         sz = wx.BoxSizer(wx.VERTICAL)

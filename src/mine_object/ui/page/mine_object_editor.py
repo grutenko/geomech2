@@ -5,13 +5,16 @@ from pony.orm import commit, db_session, select
 
 from src.ctx import app_ctx
 from src.database import CoordSystem, MineObject
+from src.mine_object.ui.choice import Choice as MineObjectChoice
 from src.ui.icon import get_icon
 from src.ui.supplied_data import SuppliedDataWidget
 from src.ui.validators import TextValidator
 
 
 class MineObjectEditor(wx.Panel):
-    def __init__(self, parent, o: MineObject = None, parent_object: MineObject = None, is_new: bool = False, tab_index=0):
+    def __init__(
+        self, parent, o: MineObject = None, parent_object: MineObject = None, is_new: bool = False, tab_index=0
+    ):
         super().__init__(parent)
         self.is_new = is_new
         self.o = o
@@ -30,7 +33,7 @@ class MineObjectEditor(wx.Panel):
 
         label = wx.StaticText(self.left, label="Родительский объект *")
         left_sz_in.Add(label, 0)
-        self.field_mine_object = wx.Choice(self.left)
+        self.field_mine_object = MineObjectChoice(self.left, mode="all_without_excavation")
         left_sz_in.Add(self.field_mine_object, 0, wx.EXPAND | wx.BOTTOM, border=10)
 
         label = wx.StaticText(self.left, label="Система координат *")
@@ -59,7 +62,9 @@ class MineObjectEditor(wx.Panel):
         self.file_icon = self.image_list.Add(get_icon("file"))
         self.right = wx.Notebook(self.splitter)
         self.right.AssignImageList(self.image_list)
-        self.supplied_data = SuppliedDataWidget(self.right, deputy_text="Недоступно для новых объектов. Сначала сохраните.")
+        self.supplied_data = SuppliedDataWidget(
+            self.right, deputy_text="Недоступно для новых объектов. Сначала сохраните."
+        )
         self.coords = wx.propgrid.PropertyGrid(self.right, style=wx.propgrid.PG_SPLITTER_AUTO_CENTER)
         self.coords.Append(wx.propgrid.FloatProperty("X Мин.", "X_Min"))
         self.coords.Append(wx.propgrid.FloatProperty("Y Мин.", "Y_Min"))
@@ -88,12 +93,7 @@ class MineObjectEditor(wx.Panel):
             self.set_fields()
 
     def set_fields(self):
-        _index = 0
-        if self.o.parent is not None:
-            for index, o in enumerate(self.mine_objects):
-                if o is not None and o.RID == self.o.parent.RID:
-                    _index = index
-        self.field_mine_object.SetSelection(_index)
+        self.field_mine_object.SetValue(self.o.parent)
         _index = 0
         for index, o in enumerate(self.coord_systems):
             if o.RID == self.o.coord_system.RID:
@@ -101,20 +101,19 @@ class MineObjectEditor(wx.Panel):
         self.field_coord_system.SetSelection(_index)
         self.field_name.SetValue(self.o.Name)
         self.field_comment.SetValue(self.o.Comment if self.o.Comment is not None else "")
-        self.coords.SetPropertyValues({"X_Min": self.o.X_Min, "Y_Min": self.o.Y_Min, "Z_Min": self.o.Z_Min, "X_Max": self.o.X_Max, "Y_Max": self.o.Y_Max, "Z_Max": self.o.Z_Max})
+        self.coords.SetPropertyValues(
+            {
+                "X_Min": self.o.X_Min,
+                "Y_Min": self.o.Y_Min,
+                "Z_Min": self.o.Z_Min,
+                "X_Max": self.o.X_Max,
+                "Y_Max": self.o.Y_Max,
+                "Z_Max": self.o.Z_Max,
+            }
+        )
 
     @db_session
     def load_choices(self):
-        def _mine_objects_r(p=None):
-            if p is not None:
-                objects = select(o for o in MineObject if o.parent == p)
-            else:
-                objects = select(o for o in MineObject if o.Level == 0)
-            for index, o in enumerate(objects):
-                self.mine_objects.append(o)
-                self.field_mine_object.Append((" . " * o.Level) + o.get_tree_name())
-                _mine_objects_r(o)
-
         def _coord_system_r(p=None):
             if p is not None:
                 objects = select(o for o in CoordSystem if o.parent == p)
@@ -124,17 +123,6 @@ class MineObjectEditor(wx.Panel):
                 self.coord_systems.append(o)
                 self.field_coord_system.Append((" . " * o.Level) + o.Name)
                 _coord_system_r(o)
-
-        self.mine_objects.append(None)
-        self.field_mine_object.Append("Корневой обьект [Регион]")
-        _mine_objects_r()
-
-        _index = 0
-        if self.parent_object is not None:
-            for index, o in enumerate(self.mine_objects):
-                if o is not None and o.RID == self.parent_object.RID:
-                    _index = index
-        self.field_mine_object.SetSelection(_index)
 
         _coord_system_r()
 
@@ -149,7 +137,13 @@ class MineObjectEditor(wx.Panel):
         if not self.Validate():
             return
         if self.parent_object is not None:
-            m = {"REGION": "Регион", "ROCKS": "Горный массив", "FIELD": "Месторождение", "HORIZON": "Горизонт", "EXCAVATION": "Выработка"}
+            m = {
+                "REGION": "Регион",
+                "ROCKS": "Горный массив",
+                "FIELD": "Месторождение",
+                "HORIZON": "Горизонт",
+                "EXCAVATION": "Выработка",
+            }
             child_mine_object_type = list(m.keys()).__getitem__(list(m.keys()).index(self.parent_object.Type) + 1)
         else:
             child_mine_object_type = "REGION"
@@ -184,7 +178,9 @@ class MineObjectEditor(wx.Panel):
         commit()
         if self.is_new:
             pubsub.pub.sendMessage("object.added", o=o)
-            app_ctx().main.open("mine_object_editor", is_new=False, o=o, parent_object=None, tab_index=self.right.GetSelection())
+            app_ctx().main.open(
+                "mine_object_editor", is_new=False, o=o, parent_object=None, tab_index=self.right.GetSelection()
+            )
             app_ctx().main.close(self)
 
     def get_name(self):

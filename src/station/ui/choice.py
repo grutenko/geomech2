@@ -2,7 +2,7 @@ import wx
 from pony.orm import db_session, select
 
 from src.ctx import app_ctx
-from src.database import BoreHole
+from src.database import Station
 
 
 class Choice(wx.Panel):
@@ -41,7 +41,7 @@ class Choice(wx.Panel):
         if self.query is not None:
             query = self.query
         else:
-            query = select(o for o in BoreHole)
+            query = select(o for o in Station)
         self.choice.Clear()
         self.items = []
         for _i, o in enumerate(query):
@@ -53,7 +53,7 @@ class Choice(wx.Panel):
 
     def on_open(self, event):
         o = self.items[self.choice.GetSelection()]
-        app_ctx().main.open("bore_hole_editor", is_new=False, o=o)
+        app_ctx().main.open("station_editor", is_new=False, o=o)
 
     def on_refresh(self, event):
         self.load()
@@ -66,9 +66,3 @@ class Choice(wx.Panel):
 
     def GetValue(self):
         return self.selection
-
-    def Disable(self):
-        self.choice.Disable()
-
-    def Enable(self, enable=True):
-        self.choice.Enable(enable)

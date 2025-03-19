@@ -6,11 +6,21 @@ import wx
 from pony.orm import commit, count, db_session, select
 from wx.grid import GridCellAutoWrapStringEditor, GridCellEditor, GridCellRenderer, GridCellStringRenderer
 
+from src.bore_hole.ui.choice import Choice as BoreHoleChoice
 from src.ctx import app_ctx
 from src.database import BoreHole, DischargeMeasurement, DischargeSeries, FoundationDocument, OrigSampleSet
 from src.datetimeutil import decode_date, encode_date
 from src.document.ui.choice import Choice as FoundationChoice
-from src.ui.grid import EVT_GRID_EDITOR_STATE_CHANGED, CellType, Column, FloatCellType, GridEditor, Model, NumberCellType, StringCellType
+from src.ui.grid import (
+    EVT_GRID_EDITOR_STATE_CHANGED,
+    CellType,
+    Column,
+    FloatCellType,
+    GridEditor,
+    Model,
+    NumberCellType,
+    StringCellType,
+)
 from src.ui.icon import get_icon
 from src.ui.validators import DateValidator, TextValidator
 
@@ -75,7 +85,13 @@ class DMModel(Model):
 
     def _prepare_o(self, o):
         r = _Row(o)
-        fields = {"SampleNumber": str(o.SampleNumber), "Diameter": str(o.Diameter), "Length": str(o.Length), "Weight": str(int(o.Weight)), "CoreDepth": str(o.CoreDepth)}
+        fields = {
+            "SampleNumber": str(o.SampleNumber),
+            "Diameter": str(o.Diameter),
+            "Length": str(o.Length),
+            "Weight": str(int(o.Weight)),
+            "CoreDepth": str(o.CoreDepth),
+        }
         e = []
         e.append(str(int(o.E1)))
         e.append(str(int(o.E2)))
@@ -123,7 +139,9 @@ class DMModel(Model):
     def load(self):
         if self._core is not None:
             self._rows = []
-            dm = select(o for o in DischargeMeasurement if o.orig_sample_set == self._core).order_by(lambda p: int(p.DschNumber))
+            dm = select(o for o in DischargeMeasurement if o.orig_sample_set == self._core).order_by(
+                lambda p: int(p.DschNumber)
+            )
             o: DischargeMeasurement
             for o in dm:
                 self._rows.append(self._prepare_o(o))
@@ -137,12 +155,40 @@ class DMModel(Model):
 
     def _build_columns(self):
         return {
-            "SampleNumber": Column("SampleNumber", StringCellType(), "* № Образца", "Регистрационный номер образца керна", self._get_column_width("SampleNumber")),
-            "Diameter": Column("Diameter", FloatCellType(prec=1), "* Диаметр\n(мм)", "Диаметр образца керна", self._get_column_width("Diameter")),
-            "Length": Column("Length", FloatCellType(prec=1), "* Длина\n(см)", "Длина образца керна", self._get_column_width("Length")),
-            "Weight": Column("Weight", NumberCellType(), "* Вес\n(г)", "Вес образца\nкерна", self._get_column_width("Weight")),
-            "CoreDepth": Column("CoreDepth", FloatCellType(), "* Глубина\nвзятия (м)", "Глубина взятия образца керна", self._get_column_width("CoreDepth")),
-            "RockType": Column("RockType", StringCellType(), "* Тип породы", "Тип породы", self._get_column_width("RockType")),
+            "SampleNumber": Column(
+                "SampleNumber",
+                StringCellType(),
+                "* № Образца",
+                "Регистрационный номер образца керна",
+                self._get_column_width("SampleNumber"),
+            ),
+            "Diameter": Column(
+                "Diameter",
+                FloatCellType(prec=1),
+                "* Диаметр\n(мм)",
+                "Диаметр образца керна",
+                self._get_column_width("Diameter"),
+            ),
+            "Length": Column(
+                "Length",
+                FloatCellType(prec=1),
+                "* Длина\n(см)",
+                "Длина образца керна",
+                self._get_column_width("Length"),
+            ),
+            "Weight": Column(
+                "Weight", NumberCellType(), "* Вес\n(г)", "Вес образца\nкерна", self._get_column_width("Weight")
+            ),
+            "CoreDepth": Column(
+                "CoreDepth",
+                FloatCellType(),
+                "* Глубина\nвзятия (м)",
+                "Глубина взятия образца керна",
+                self._get_column_width("CoreDepth"),
+            ),
+            "RockType": Column(
+                "RockType", StringCellType(), "* Тип породы", "Тип породы", self._get_column_width("RockType")
+            ),
             "E": Column(
                 "E",
                 VecCellType(NumberCellType(), min_count=1, max_count=4),
@@ -150,10 +196,34 @@ class DMModel(Model):
                 "Относительная деформация образца (усл. ед.)",
                 self._get_column_width("E"),
             ),
-            "Rotate": Column("Rotate", FloatCellType(), "* Угол корр.\nнапряж.\n(град.)", "Угол коррекции направления напряжений", self._get_column_width("Rotate")),
-            "PartNumber": Column("PartNumber", StringCellType(), "* № партии\nтензодат", "Номер партии тензодатчиков", self._get_column_width("PartNumber")),
-            "RTens": Column("RTens", FloatCellType(prec=1), "* Сопрот.\nТезодат. (Ом)", "Сопротивление тензодатчиков", self._get_column_width("RTens")),
-            "Sensitivity": Column("Sensitivity", FloatCellType(), "* Чувств.\nТезодат.", "Коэффициент чувствительности тензодатчиков", self._get_column_width("Sensitivity")),
+            "Rotate": Column(
+                "Rotate",
+                FloatCellType(),
+                "* Угол корр.\nнапряж.\n(град.)",
+                "Угол коррекции направления напряжений",
+                self._get_column_width("Rotate"),
+            ),
+            "PartNumber": Column(
+                "PartNumber",
+                StringCellType(),
+                "* № партии\nтензодат",
+                "Номер партии тензодатчиков",
+                self._get_column_width("PartNumber"),
+            ),
+            "RTens": Column(
+                "RTens",
+                FloatCellType(prec=1),
+                "* Сопрот.\nТезодат. (Ом)",
+                "Сопротивление тензодатчиков",
+                self._get_column_width("RTens"),
+            ),
+            "Sensitivity": Column(
+                "Sensitivity",
+                FloatCellType(),
+                "* Чувств.\nТезодат.",
+                "Коэффициент чувствительности тензодатчиков",
+                self._get_column_width("Sensitivity"),
+            ),
             "TP1": Column(
                 "TP1",
                 VecCellType(FloatCellType(prec=1), 0, 2),
@@ -171,7 +241,12 @@ class DMModel(Model):
                 optional=True,
             ),
             "PWSpeed": Column(
-                "PWSpeed", NumberCellType(), "Скорость\nпродоль.\n(м/с)", "Коэффициент чувствительности тензодатчиков", self._get_column_width("PWSpeed"), optional=True
+                "PWSpeed",
+                NumberCellType(),
+                "Скорость\nпродоль.\n(м/с)",
+                "Коэффициент чувствительности тензодатчиков",
+                self._get_column_width("PWSpeed"),
+                optional=True,
             ),
             "TR": Column(
                 "TR",
@@ -181,13 +256,46 @@ class DMModel(Model):
                 self._get_column_width("TR"),
                 optional=True,
             ),
-            "RWSpeed": Column("RWSpeed", NumberCellType(), "Скорость\nповерхност.\n(м/с)", "Скорость поверхностны волн", self._get_column_width("RWSpeed"), optional=True),
-            "TS": Column("TS", VecCellType(NumberCellType(), 0, 2), "t попереч.\n(мс)", "Замер времени прохождения поперечных волн", self._get_column_width("TS"), optional=True),
-            "SWSpeed": Column("SWSpeed", NumberCellType(), "Скорость\nпопереч.\n(м/с)", "Скорость поперечных волн", self._get_column_width("SWSpeed"), optional=True),
-            "PuassonStatic": Column(
-                "PuassonStatic", FloatCellType(), "Пуассон\nдинамич.", "Динамический коэффициент Пуассона", self._get_column_width("PuassonStatic"), optional=True
+            "RWSpeed": Column(
+                "RWSpeed",
+                NumberCellType(),
+                "Скорость\nповерхност.\n(м/с)",
+                "Скорость поверхностны волн",
+                self._get_column_width("RWSpeed"),
+                optional=True,
             ),
-            "YungStatic": Column("YungStatic", FloatCellType(), "Юнг\nдинамич.", "Динамический модуль Юнга", self._get_column_width("YungStatic"), optional=True),
+            "TS": Column(
+                "TS",
+                VecCellType(NumberCellType(), 0, 2),
+                "t попереч.\n(мс)",
+                "Замер времени прохождения поперечных волн",
+                self._get_column_width("TS"),
+                optional=True,
+            ),
+            "SWSpeed": Column(
+                "SWSpeed",
+                NumberCellType(),
+                "Скорость\nпопереч.\n(м/с)",
+                "Скорость поперечных волн",
+                self._get_column_width("SWSpeed"),
+                optional=True,
+            ),
+            "PuassonStatic": Column(
+                "PuassonStatic",
+                FloatCellType(),
+                "Пуассон\nдинамич.",
+                "Динамический коэффициент Пуассона",
+                self._get_column_width("PuassonStatic"),
+                optional=True,
+            ),
+            "YungStatic": Column(
+                "YungStatic",
+                FloatCellType(),
+                "Юнг\nдинамич.",
+                "Динамический модуль Юнга",
+                self._get_column_width("YungStatic"),
+                optional=True,
+            ),
         }
 
     def get_columns(self) -> Iterable[Column]:
@@ -289,7 +397,9 @@ class DMModel(Model):
     @db_session
     def save(self):
         if len(self.validate()) > 0:
-            wx.MessageBox("В таблице обнаружены ошибки. Сохранение невозможно.", "Ошибка сохранения.", style=wx.OK | wx.ICON_ERROR)
+            wx.MessageBox(
+                "В таблице обнаружены ошибки. Сохранение невозможно.", "Ошибка сохранения.", style=wx.OK | wx.ICON_ERROR
+            )
             return False
 
         for _id in self._deleted_rows:
@@ -385,15 +495,8 @@ class TestSeriesEditor(wx.Panel):
         l_sz_in = wx.BoxSizer(wx.VERTICAL)
         label = wx.StaticText(self.left, label="Скважина *")
         l_sz_in.Add(label, 0, wx.EXPAND)
-        self.field_bore_hole = wx.Choice(self.left)
-        l_sz_in.Add(self.field_bore_hole, 0, wx.EXPAND)
-        self.open_bore_hole = wx.StaticText(self.left, label="Открыть")
-        font = wx.Font().Underlined()
-        self.open_bore_hole.SetFont(font)
-        self.open_bore_hole.SetForegroundColour(wx.Colour(100, 100, 255))
-        self.open_bore_hole.Bind(wx.EVT_LEFT_DOWN, self.on_open_bore_hole)
-        self.open_bore_hole.SetCursor(wx.Cursor(wx.CURSOR_HAND))
-        l_sz_in.Add(self.open_bore_hole, 0, wx.EXPAND | wx.BOTTOM, border=10)
+        self.field_bore_hole = BoreHoleChoice(self.left)
+        l_sz_in.Add(self.field_bore_hole, 0, wx.EXPAND | wx.BOTTOM, border=10)
         label = wx.StaticText(self.left, label="Название *")
         l_sz_in.Add(label, 0)
         self.field_name = wx.TextCtrl(self.left, size=wx.Size(250, 25))
@@ -449,7 +552,14 @@ class TestSeriesEditor(wx.Panel):
             orig_sample_set = o.orig_sample_set
         else:
             orig_sample_set = None
-        self.grid = GridEditor(p, DMModel(orig_sample_set), app_ctx().main.menu, self.grid_toolbar, app_ctx().main.statusbar, header_height=45)
+        self.grid = GridEditor(
+            p,
+            DMModel(orig_sample_set),
+            app_ctx().main.menu,
+            self.grid_toolbar,
+            app_ctx().main.statusbar,
+            header_height=45,
+        )
         p_sz.Add(self.grid, 1, wx.EXPAND)
         p.SetSizer(p_sz)
         self.right.AddPage(p, "Замеры", imageId=self.table_icon)
@@ -461,23 +571,10 @@ class TestSeriesEditor(wx.Panel):
         self.update_controls_state()
         self.bind_all()
         self.bore_holes = []
-        query = select(o for o in BoreHole if count(o.orig_sample_sets) > 0 and o.station != None)  # noqa: E711
-        for o in query:
-            discharge_series = select(oo for oo in DischargeSeries if oo.orig_sample_set in o.orig_sample_sets).first()
-            if discharge_series is None or (not self.is_new and discharge_series.RID == self.o.RID):
-                self.bore_holes.append(o)
-                self.field_bore_hole.Append(o.Name)
-        if self.field_bore_hole.GetCount() > 0:
-            self.field_bore_hole.SetSelection(0)
         if not self.is_new:
             self.field_bore_hole.Disable()
             self.set_fields()
         self.on_select()
-
-    def on_open_bore_hole(self, event):
-        index = self.field_bore_hole.GetSelection()
-        bore_hole = self.bore_holes[index]
-        app_ctx().main.open("bore_hole_editor", is_new=False, o=bore_hole)
 
     @db_session
     def set_fields(self):
