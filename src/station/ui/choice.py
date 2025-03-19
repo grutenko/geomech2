@@ -13,6 +13,7 @@ class Choice(wx.Panel):
         self.query = query
         sz = wx.BoxSizer(wx.VERTICAL)
         self.choice = wx.Choice(self)
+        self.choice.SetMaxSize(wx.Size(250, -1))
         sz.Add(self.choice, 0, wx.EXPAND)
         hsz = wx.BoxSizer(wx.HORIZONTAL)
         sz.Add(hsz, 0, wx.EXPAND)

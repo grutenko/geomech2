@@ -584,6 +584,7 @@ class TestSeriesEditor(wx.Panel):
         if self.o.EndMeasure is not None:
             self.field_end_date.SetValue(str(decode_date(self.o.EndMeasure)))
         self.field_foundation_doc.SetValue(self.o.foundation_document)
+        self.field_bore_hole.SetValue(self.o.orig_sample_set.bore_hole)
 
     def bind_all(self):
         self.grid.Bind(EVT_GRID_EDITOR_STATE_CHANGED, self.on_editor_state_changed)

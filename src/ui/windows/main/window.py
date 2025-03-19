@@ -6,6 +6,7 @@ import wx.aui
 from pony.orm import db_session
 
 import src.bore_hole.ui.page.bore_hole_editor
+import src.bore_hole.ui.page.list
 import src.discharge.ui.page.list
 import src.discharge.ui.page.test_series_editor
 import src.fms.ui.page.sample_set_editor
@@ -15,6 +16,7 @@ import src.mine_object.ui.page.mine_object_editor
 import src.objects.ui.page.tree
 import src.rock_burst.ui.page.editor
 import src.rock_burst.ui.page.list
+import src.station.ui.page.list
 import src.station.ui.page.station_editor
 from src.config import flush
 from src.ctx import app_ctx
@@ -26,7 +28,14 @@ from src.ui.page import EVT_PAGE_HDR_CHANGED
 from src.ui.windows.login import LoginDialog
 from src.ui.windows.settings.window import SettingsWindow
 
-from .actions import ID_CHANGE_CREDENTIALS, ID_OPEN_DISCHARGE, ID_OPEN_DOCUMENTS, ID_OPEN_FMS_TREE, ID_OPEN_ROCK_BURST_TREE, ID_OPEN_TREE
+from .actions import (
+    ID_CHANGE_CREDENTIALS,
+    ID_OPEN_DISCHARGE,
+    ID_OPEN_DOCUMENTS,
+    ID_OPEN_FMS_TREE,
+    ID_OPEN_ROCK_BURST_TREE,
+    ID_OPEN_TREE,
+)
 from .menu import MainMenu
 from .toolbar import MainToolbar
 
@@ -87,25 +96,39 @@ class MainWindow(wx.Frame):
         self.Show()
 
         def mine_object_editor_def(o=None, is_new=False, parent_object=None, tab_index=0):
-            return src.mine_object.ui.page.mine_object_editor.MineObjectEditor(self.notebook, o, parent_object, is_new, tab_index)
+            return src.mine_object.ui.page.mine_object_editor.MineObjectEditor(
+                self.notebook, o, parent_object, is_new, tab_index
+            )
 
         def station_editor_def(o=None, is_new=False, parent_object=None):
-            return src.station.ui.page.station_editor.StationEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
+            return src.station.ui.page.station_editor.StationEditor(
+                self.notebook, is_new=is_new, o=o, parent_object=parent_object
+            )
 
         def bore_hole_editor_def(o=None, is_new=False, parent_object=None):
-            return src.bore_hole.ui.page.bore_hole_editor.BoreHoleEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
+            return src.bore_hole.ui.page.bore_hole_editor.BoreHoleEditor(
+                self.notebook, is_new=is_new, o=o, parent_object=parent_object
+            )
 
         def rock_burst_editor_def(o=None, is_new=False, parent_object=None):
-            return src.rock_burst.ui.page.editor.RockBurstEditor(self.notebook, o=o, is_new=is_new, parent_object=parent_object)
+            return src.rock_burst.ui.page.editor.RockBurstEditor(
+                self.notebook, o=o, is_new=is_new, parent_object=parent_object
+            )
 
         def pm_sample_set_editor_def(o=None, is_new=False, parent_object=None):
-            return src.fms.ui.page.sample_set_editor.PmSampleSetEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
+            return src.fms.ui.page.sample_set_editor.PmSampleSetEditor(
+                self.notebook, is_new=is_new, o=o, parent_object=parent_object
+            )
 
         def test_series_editor_def(o=None, is_new=False, parent_object=None):
-            return src.discharge.ui.page.test_series_editor.TestSeriesEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
+            return src.discharge.ui.page.test_series_editor.TestSeriesEditor(
+                self.notebook, is_new=is_new, o=o, parent_object=parent_object
+            )
 
         def pm_test_series_editor_def(o=None, is_new=False, parent_object=None):
-            return src.fms.ui.page.test_series_editor.PmTestSeriesEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
+            return src.fms.ui.page.test_series_editor.PmTestSeriesEditor(
+                self.notebook, is_new=is_new, o=o, parent_object=parent_object
+            )
 
         def documents_editor_def(o=None, is_new=False, parent_object=None):
             return DocumentEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
@@ -255,7 +278,9 @@ class MainWindow(wx.Frame):
     def on_change_credentials(self, event):
         dlg = LoginDialog(self, mode="CHANGE_CREDENTIALS")
         if dlg.ShowModal() == wx.ID_OK:
-            wx.MessageBox("Изменения вступят в силу после перезагрузки", "Доступы изменены", wx.OK | wx.ICON_INFORMATION)
+            wx.MessageBox(
+                "Изменения вступят в силу после перезагрузки", "Доступы изменены", wx.OK | wx.ICON_INFORMATION
+            )
 
     def find_ctx_by_code(self, code):
         _ctx = None
@@ -348,6 +373,9 @@ class MainWindow(wx.Frame):
         self.toolbar.ToggleTool(ID_OPEN_DISCHARGE, self.find_ctx_by_code("discharge_list") is not None)
         self.toolbar.ToggleTool(ID_OPEN_DOCUMENTS, self.find_ctx_by_code("documents_list") is not None)
         self.menu.Enable(wx.ID_CLOSE, self.notebook.GetPageCount() > 0)
-        self.menu.Enable(wx.ID_PREVIEW_NEXT, self.notebook.GetPageCount() > 0 and self.notebook.GetSelection() < self.notebook.GetPageCount() - 1)
+        self.menu.Enable(
+            wx.ID_PREVIEW_NEXT,
+            self.notebook.GetPageCount() > 0 and self.notebook.GetSelection() < self.notebook.GetPageCount() - 1,
+        )
         self.menu.Enable(wx.ID_PREVIEW_PREVIOUS, self.notebook.GetPageCount() > 0 and self.notebook.GetSelection() > 0)
         self.toolbar.Realize()

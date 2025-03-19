@@ -13,6 +13,7 @@ class Choice(wx.Panel):
         self.mode = mode
         sz = wx.BoxSizer(wx.VERTICAL)
         self.choice = wx.Choice(self)
+        self.choice.SetMaxSize(wx.Size(250, -1))
         sz.Add(self.choice, 0, wx.EXPAND)
         hsz = wx.BoxSizer(wx.HORIZONTAL)
         sz.Add(hsz, 0, wx.EXPAND)
@@ -35,6 +36,7 @@ class Choice(wx.Panel):
         self.Layout()
         self.load()
         self.choice.Bind(wx.EVT_CHOICE, self.on_choice)
+        self.update_controls_state()
 
     @db_session
     def load(self):
@@ -53,7 +55,7 @@ class Choice(wx.Panel):
             for o in q:
                 self.items.append(o)
                 self.choice.Append((" . " * o.Level) + o.get_tree_name())
-                if self.mode == "all_without_excavation" and o.Type != "HORIZON":
+                if self.mode == "all" or (self.mode == "all_without_excavation" and o.Type != "HORIZON"):
                     _r(o)
 
         if self.mode in ["all", "all_with_stations", "all_without_excavation"]:
@@ -102,7 +104,7 @@ class Choice(wx.Panel):
                 self.selection = o
                 self.choice.SetSelection(_i)
                 break
-        print(value)
+        self.update_controls_state()
 
     def GetValue(self):
         return self.selection

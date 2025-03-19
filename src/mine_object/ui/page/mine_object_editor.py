@@ -91,6 +91,8 @@ class MineObjectEditor(wx.Panel):
             self.field_mine_object.Disable()
             self.field_coord_system.Disable()
             self.set_fields()
+        else:
+            self.field_mine_object.SetValue(self.parent_object)
 
     def set_fields(self):
         self.field_mine_object.SetValue(self.o.parent)

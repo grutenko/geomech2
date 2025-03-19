@@ -6,6 +6,7 @@ from pony.orm import commit, db_session, select
 from src.ctx import app_ctx
 from src.database import MineObject, Station
 from src.datetimeutil import decode_date, encode_date
+from src.mine_object.ui.choice import Choice as MineObjectChoice
 from src.ui.icon import get_icon
 from src.ui.page import PageHdrChangedEvent
 from src.ui.supplied_data import SuppliedDataWidget
@@ -32,7 +33,7 @@ class StationEditor(wx.Panel):
 
         label = wx.StaticText(self.left, label="Горный объект *")
         left_sz_in.Add(label, 0)
-        self.field_mine_object = wx.Choice(self.left)
+        self.field_mine_object = MineObjectChoice(self.left)
         left_sz_in.Add(self.field_mine_object, 0, wx.EXPAND | wx.BOTTOM, border=10)
 
         label = wx.StaticText(self.left, label="Название *")
@@ -65,7 +66,9 @@ class StationEditor(wx.Panel):
         self.left.SetScrollRate(10, 10)
 
         self.right = wx.Notebook(self.splitter)
-        self.supplied_data = SuppliedDataWidget(self.right, deputy_text="Недоступно для новых объектов. Сначала сохраните.")
+        self.supplied_data = SuppliedDataWidget(
+            self.right, deputy_text="Недоступно для новых объектов. Сначала сохраните."
+        )
         self.coords = wx.propgrid.PropertyGrid(self.right, style=wx.propgrid.PG_SPLITTER_AUTO_CENTER)
         self.coords.Append(wx.propgrid.FloatProperty("X Мин.", "X_Min"))
         self.coords.Append(wx.propgrid.FloatProperty("Y Мин.", "Y_Min"))
@@ -81,7 +84,6 @@ class StationEditor(wx.Panel):
         self.SetSizer(sz)
         self.Layout()
         self.bind_all()
-        self.load_choices()
         if not self.is_new:
             self.set_fields()
             self.field_mine_object.Disable()
@@ -92,40 +94,12 @@ class StationEditor(wx.Panel):
 
     @db_session
     def set_fields(self):
-        _index = 0
-        if self.o.mine_object is not None:
-            for index, o in enumerate(self.mine_objects):
-                if o is not None and o.RID == self.o.mine_object.RID:
-                    _index = index
-        self.field_mine_object.SetSelection(_index)
+        self.field_mine_object.SetValue(self.o.mine_object)
         self.field_name.SetValue(self.o.Name)
         self.field_comment.SetValue(self.o.Comment if self.o.Comment is not None else "")
         self.field_start_date.SetValue(str(decode_date(self.o.StartDate)))
         if self.o.EndDate is not None:
             self.field_end_date.SetValue(str(decode_date(self.o.EndDate)))
-
-    @db_session
-    def load_choices(self):
-        def _mine_objects_r(p=None):
-            if p is not None:
-                objects = select(o for o in MineObject if o.parent == p)
-            else:
-                objects = select(o for o in MineObject if o.Level == 0)
-            for index, o in enumerate(objects):
-                self.mine_objects.append(o)
-                self.field_mine_object.Append((" . " * o.Level) + o.get_tree_name())
-                _mine_objects_r(o)
-
-        self.mine_objects.append(None)
-        self.field_mine_object.Append("Корневой обьект [Регион]")
-        _mine_objects_r()
-
-        _index = 0
-        if self.parent_object is not None:
-            for index, o in enumerate(self.mine_objects):
-                if o is not None and o.RID == self.parent_object.RID:
-                    _index = index
-        self.field_mine_object.SetSelection(_index)
 
     def get_name(self):
         if self.is_new:

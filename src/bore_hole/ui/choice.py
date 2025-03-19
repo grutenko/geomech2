@@ -13,6 +13,7 @@ class Choice(wx.Panel):
         self.query = query
         sz = wx.BoxSizer(wx.VERTICAL)
         self.choice = wx.Choice(self)
+        self.choice.SetMaxSize(wx.Size(250, -1))
         sz.Add(self.choice, 0, wx.EXPAND)
         hsz = wx.BoxSizer(wx.HORIZONTAL)
         sz.Add(hsz, 0, wx.EXPAND)
@@ -66,6 +67,13 @@ class Choice(wx.Panel):
 
     def GetValue(self):
         return self.selection
+
+    def SetValue(self, value):
+        for _i, o in enumerate(self.items):
+            if isinstance(value, BoreHole) or value.RID == o.RID:
+                self.selection = o
+                self.choice.SetSelection(_i)
+                break
 
     def Disable(self):
         self.choice.Disable()
