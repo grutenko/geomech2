@@ -1,6 +1,6 @@
 import pubsub.pub
 import wx
-from pony.orm import commit, db_session
+from pony.orm import commit, db_session, select
 
 from src.ctx import app_ctx
 from src.database import FoundationDocument
@@ -11,9 +11,10 @@ from src.ui.validators import DateValidator, TextValidator
 
 
 class DocumentEditor(wx.Panel):
+    @db_session
     def __init__(self, parent, is_new=False, o=None, parent_object=None):
         self.is_new = is_new
-        self.o = o
+        self.o = select(o for o in FoundationDocument if o.RID == o.RID) if not is_new else None
         self.parent_object = parent_object
         super().__init__(parent)
         sz = wx.BoxSizer(wx.VERTICAL)
@@ -35,17 +36,17 @@ class DocumentEditor(wx.Panel):
         self.field_number = wx.TextCtrl(self.left)
         self.field_number.SetValidator(TextValidator(lenMin=1, lenMax=255))
         p_sz_in.Add(self.field_number, 0, wx.EXPAND | wx.BOTTOM, border=10)
-        label = wx.StaticText(self.left, label="Комментарий")
-        p_sz_in.Add(label, 0)
-        self.field_comment = wx.TextCtrl(self.left, size=wx.Size(250, 100), style=wx.TE_MULTILINE)
-        self.field_comment.SetValidator(TextValidator(lenMin=0, lenMax=256))
-        p_sz_in.Add(self.field_comment, 0, wx.EXPAND | wx.BOTTOM, border=10)
-        label = wx.StaticText(self.left, label="Датировка")
+        label = wx.StaticText(self.left, label="Датировка *")
         p_sz_in.Add(label, 0)
         self.field_date = wx.TextCtrl(self.left)
         self.field_date.SetValidator(DateValidator(allow_empty=False))
         p_sz_in.Add(self.field_date, 0, wx.EXPAND | wx.BOTTOM, border=10)
         p_sz.Add(p_sz_in, 1, wx.EXPAND | wx.ALL, border=10)
+        label = wx.StaticText(self.left, label="Комментарий")
+        p_sz_in.Add(label, 0)
+        self.field_comment = wx.TextCtrl(self.left, size=wx.Size(250, 100), style=wx.TE_MULTILINE)
+        self.field_comment.SetValidator(TextValidator(lenMin=0, lenMax=256))
+        p_sz_in.Add(self.field_comment, 0, wx.EXPAND | wx.BOTTOM, border=10)
         self.left.SetSizer(p_sz)
         self.left.SetVirtualSize(self.left.GetBestSize() + (250, 250))
         self.left.SetScrollRate(10, 10)
@@ -71,6 +72,9 @@ class DocumentEditor(wx.Panel):
 
     @db_session
     def save(self, event):
+        if not self.Validate():
+            return
+
         fields = {"Type": self.field_type.GetValue().strip(), "Number": self.field_number.GetValue().strip(), "Comment": self.field_comment.GetValue().strip()}
         if len(self.field_date.GetValue().strip()) > 0:
             fields["DocDate"] = encode_date(self.field_date.GetValue().strip())

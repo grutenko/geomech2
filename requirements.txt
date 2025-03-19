@@ -6,3 +6,4 @@ pyinstaller==6.12.0
 attrdict2==0.0.2
 pypubsub==4.0.3
 transliterate==1.10.2
+tqdm==4.67.1

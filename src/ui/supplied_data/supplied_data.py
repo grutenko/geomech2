@@ -335,7 +335,14 @@ class SuppliedDataWidget(wx.Panel):
         item = self.toolbar.AddTool(wx.ID_ADD, "Добавить раздел", get_icon("folder-add"))
         self.toolbar.EnableTool(wx.ID_ADD, False)
         self.toolbar.Bind(wx.EVT_TOOL, self._on_create_folder, item)
-        item = self.toolbar.AddTool(wx.ID_FILE, "Добавить файл", get_icon("file-add"))
+        item = self.toolbar.AddTool(wx.ID_FILE, "Добавить файл", get_icon("file-add"), kind=wx.ITEM_DROPDOWN)
+        self.toolbar.AddSeparator()
+        item = self.toolbar.AddTool(wx.ID_EDIT, "Изменить", get_icon("edit"))
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_edit, id=wx.ID_EDIT)
+        self.toolbar.AddTool(wx.ID_DELETE, "Удалить", get_icon("delete"))
+        self.toolbar.Bind(wx.EVT_TOOL, self._on_delete, id=wx.ID_DELETE)
+        self.toolbar.EnableTool(wx.ID_EDIT, False)
+        self.toolbar.EnableTool(wx.ID_DELETE, False)
         self.toolbar.AddStretchableSpace()
         item = self.toolbar.AddTool(wx.ID_DOWN, "Скачать", get_icon("download"), kind=wx.ITEM_DROPDOWN)
         self.toolbar.EnableTool(wx.ID_FILE, False)
@@ -389,6 +396,7 @@ class SuppliedDataWidget(wx.Panel):
         dlg = FolderEditor(self, self.o.RID, self._type)
         if dlg.ShowModal() == wx.ID_OK:
             self._render()
+        self._update_controls_state()
 
     def _on_create_file(self, event):
         item = self.list.GetSelection()
@@ -396,6 +404,7 @@ class SuppliedDataWidget(wx.Panel):
         dlg = FileEditor(self, p=o)
         if dlg.ShowModal() == wx.ID_OK:
             self._render()
+        self._update_controls_state()
 
     def _on_delete(self, event):
         item = self.list.GetSelection()
@@ -408,6 +417,7 @@ class SuppliedDataWidget(wx.Panel):
             return
         if delete_object(o, rel):
             self._render()
+        self._update_controls_state()
 
     def _on_item_contenxt_menu(self, event: wx.dataview.DataViewEvent):
         item = event.GetItem()
@@ -431,6 +441,8 @@ class SuppliedDataWidget(wx.Panel):
             item.SetBitmap(get_icon("delete"))
 
         self.PopupMenu(menu, event.GetPosition())
+
+    def on_edit(self, event): ...
 
     def _apply_icon(self, icon_name, icon):
         if icon_name not in self._icons:
@@ -465,6 +477,8 @@ class SuppliedDataWidget(wx.Panel):
         if item.IsOk():
             folder_selected = isinstance(self.list.GetItemData(item), SuppliedData)
         self.toolbar.EnableTool(wx.ID_FILE, folder_selected)
+        self.toolbar.EnableTool(wx.ID_EDIT, folder_selected)
+        self.toolbar.EnableTool(wx.ID_DELETE, folder_selected)
 
     def start(self, o, _type):
         self.o = o
