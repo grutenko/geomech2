@@ -9,6 +9,7 @@ from wx.grid import GridCellAutoWrapStringEditor, GridCellEditor, GridCellRender
 from src.ctx import app_ctx
 from src.database import BoreHole, DischargeMeasurement, DischargeSeries, FoundationDocument, OrigSampleSet
 from src.datetimeutil import decode_date, encode_date
+from src.document.ui.choice import Choice as FoundationChoice
 from src.ui.grid import EVT_GRID_EDITOR_STATE_CHANGED, CellType, Column, FloatCellType, GridEditor, Model, NumberCellType, StringCellType
 from src.ui.icon import get_icon
 from src.ui.validators import DateValidator, TextValidator
@@ -391,7 +392,7 @@ class TestSeriesEditor(wx.Panel):
         self.open_bore_hole.SetFont(font)
         self.open_bore_hole.SetForegroundColour(wx.Colour(100, 100, 255))
         self.open_bore_hole.Bind(wx.EVT_LEFT_DOWN, self.on_open_bore_hole)
-        self.open_bore_hole.SetCursor(wx.StockCursor(wx.CURSOR_HAND))
+        self.open_bore_hole.SetCursor(wx.Cursor(wx.CURSOR_HAND))
         l_sz_in.Add(self.open_bore_hole, 0, wx.EXPAND | wx.BOTTOM, border=10)
         label = wx.StaticText(self.left, label="Название *")
         l_sz_in.Add(label, 0)
@@ -416,13 +417,17 @@ class TestSeriesEditor(wx.Panel):
         l_sz_in.Add(self.field_end_date, 0, wx.EXPAND | wx.BOTTOM, border=10)
         l_sz.Add(l_sz_in, 1, wx.EXPAND | wx.ALL, border=10)
         label = wx.StaticText(self.left, label="Документ обоснование *")
-        l_sz_in.Add(label, 0, wx.EXPAND)
-        self.field_foundation_doc = wx.Choice(self.left)
+        l_sz_in.Add(label, 0)
+        self.field_foundation_doc = FoundationChoice(self.left)
         l_sz_in.Add(self.field_foundation_doc, 0, wx.EXPAND | wx.BOTTOM, border=10)
         self.left.SetSizer(l_sz)
         self.left.SetVirtualSize(self.left.GetBestSize() + (250, 250))
         self.left.SetScrollRate(10, 10)
+
+        self.image_list = wx.ImageList(16, 16)
+        self.table_icon = self.image_list.Add(get_icon("table"))
         self.right = wx.Notebook(self.splitter)
+        self.right.AssignImageList(self.image_list)
         p = wx.Panel(self.right)
         p_sz = wx.BoxSizer(wx.VERTICAL)
         self.grid_toolbar = wx.ToolBar(p, style=wx.TB_FLAT | wx.TB_HORZ_TEXT)
@@ -447,7 +452,7 @@ class TestSeriesEditor(wx.Panel):
         self.grid = GridEditor(p, DMModel(orig_sample_set), app_ctx().main.menu, self.grid_toolbar, app_ctx().main.statusbar, header_height=45)
         p_sz.Add(self.grid, 1, wx.EXPAND)
         p.SetSizer(p_sz)
-        self.right.AddPage(p, "Замеры")
+        self.right.AddPage(p, "Замеры", imageId=self.table_icon)
         self.splitter.SplitVertically(self.left, self.right, 280)
         self.splitter.SetMinimumPaneSize(250)
         sz.Add(self.splitter, 1, wx.EXPAND)
@@ -464,13 +469,6 @@ class TestSeriesEditor(wx.Panel):
                 self.field_bore_hole.Append(o.Name)
         if self.field_bore_hole.GetCount() > 0:
             self.field_bore_hole.SetSelection(0)
-        self.foundation_documents = [None]
-        self.field_foundation_doc.Append("Без документа")
-        for o in select(o for o in FoundationDocument):
-            self.foundation_documents.append(o)
-            self.field_foundation_doc.Append(o.Name)
-        if self.field_foundation_doc.GetCount() > 0:
-            self.field_foundation_doc.SetSelection(0)
         if not self.is_new:
             self.field_bore_hole.Disable()
             self.set_fields()
@@ -488,15 +486,7 @@ class TestSeriesEditor(wx.Panel):
         self.field_start_date.SetValue(str(decode_date(self.o.StartMeasure)))
         if self.o.EndMeasure is not None:
             self.field_end_date.SetValue(str(decode_date(self.o.EndMeasure)))
-        _index = 0
-        _doc = None
-        if self.o.foundation_document is not None:
-            _doc = FoundationDocument[self.o.foundation_document.RID]
-            for index, o in enumerate(self.foundation_documents):
-                if o.RID == _doc.RID:
-                    _index = index + 1
-                    break
-        self.field_foundation_doc.SetSelection(_index)
+        self.field_foundation_doc.SetValue(self.o.foundation_document)
 
     def bind_all(self):
         self.grid.Bind(EVT_GRID_EDITOR_STATE_CHANGED, self.on_editor_state_changed)

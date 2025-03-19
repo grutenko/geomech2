@@ -2,7 +2,7 @@ import wx
 from pony.orm import db_session, select
 
 from src.ctx import app_ctx
-from src.database import BoreHole
+from src.database import MineObject
 
 
 class Choice(wx.Panel):

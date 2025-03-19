@@ -22,12 +22,12 @@ class DischargeList(wx.Panel, listmix.ColumnSorterMixin):
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         self.toolbar = wx.ToolBar(self, style=wx.TB_FLAT | wx.TB_HORZ_TEXT)
         self.toolbar.AddTool(wx.ID_ADD, "Добавить", get_icon("file-add"))
-        self.toolbar.Bind(wx.EVT_TOOL, self.on_add, id=wx.ID_ADD)
+        self.toolbar.Bind(wx.EVT_TOOL, self._on_add, id=wx.ID_ADD)
         self.toolbar.AddSeparator()
         self.toolbar.AddTool(wx.ID_EDIT, "Изменить", get_icon("edit"))
-        self.toolbar.Bind(wx.EVT_TOOL, self.on_edit, id=wx.ID_EDIT)
+        self.toolbar.Bind(wx.EVT_TOOL, self._on_edit, id=wx.ID_EDIT)
         self.toolbar.AddTool(wx.ID_DELETE, "Удалить", get_icon("delete"))
-        self.toolbar.Bind(wx.EVT_TOOL, self.on_delete, id=wx.ID_DELETE)
+        self.toolbar.Bind(wx.EVT_TOOL, self._on_delete, id=wx.ID_DELETE)
         self.toolbar.EnableTool(wx.ID_EDIT, False)
         self.toolbar.EnableTool(wx.ID_DELETE, False)
         self.toolbar.AddStretchableSpace()
@@ -54,13 +54,14 @@ class DischargeList(wx.Panel, listmix.ColumnSorterMixin):
         self._load()
         self._bind_all()
         self._silence_select = False
+        self._list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_item_selection_changed)
+        self._list.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.on_item_selection_changed)
+
+    def on_item_selection_changed(self, event):
+        self.update_controls_state()
 
     def on_refresh(self, event):
         self._load()
-
-    def on_add(self, event): ...
-
-    def on_edit(self, event): ...
 
     def on_delete(self, event): ...
 
@@ -225,3 +226,7 @@ class DischargeList(wx.Panel, listmix.ColumnSorterMixin):
 
     def serialize(self):
         return {}
+
+    def update_controls_state(self):
+        self.toolbar.EnableTool(wx.ID_EDIT, self._list.GetSelectedItemCount() > 0)
+        self.toolbar.EnableTool(wx.ID_DELETE, self._list.GetSelectedItemCount() > 0)
