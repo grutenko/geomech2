@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 
@@ -18,10 +19,13 @@ class BuildExecutable(build_py):
             "--clean",
             "--splash=icons/logo.png",
             "--add-data=icons:icons",
+            "--add-data=fonts:fonts",
             "--name=geomech",
+            "--hidden-import=jedi",
             "--hidden-import=wx._xml",
             "--hidden-import=pony.orm.dbproviders",
             "--hidden-import=pony.orm.dbproviders.postgres",
+            "--hidden-import=pony.orm.dbproviders.sqlite",
             "--hidden-import=psycopg2",
             "--hidden-import=transliterate",
             "--collect-all=transliterate",
@@ -33,7 +37,10 @@ class BuildExecutable(build_py):
         else:
             args.append("--icon=icons/logo.ico")
         args.append("__main__.py")
-        subprocess.run(args, check=True)  # Create a single executable file  # Name of the output file  # Your main script
+        os.environ["PYTHONOPTIMIZE"] = "1"
+        subprocess.run(
+            args, check=True, env=os.environ
+        )  # Create a single executable file  # Name of the output file  # Your main script
         super().run()
 
 

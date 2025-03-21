@@ -7,6 +7,7 @@ from pony.orm import db_session
 
 import src.bore_hole.ui.page.bore_hole_editor
 import src.bore_hole.ui.page.list
+import src.console.ui.page.script_editor
 import src.discharge.ui.page.list
 import src.discharge.ui.page.test_series_editor
 import src.fms.ui.page.sample_set_editor
@@ -30,6 +31,7 @@ from src.ui.windows.settings.window import SettingsWindow
 
 from .actions import (
     ID_CHANGE_CREDENTIALS,
+    ID_OPEN_CONSOLE,
     ID_OPEN_DISCHARGE,
     ID_OPEN_DOCUMENTS,
     ID_OPEN_FMS_TREE,
@@ -138,6 +140,7 @@ class MainWindow(wx.Frame):
             "fms_tree": lambda **kwds: src.fms.ui.page.tree.TreePage(self.notebook),
             "rock_burst_list": lambda **kwds: src.rock_burst.ui.page.list.RockBurstWidget(self.notebook),
             "discharge_list": lambda **kwds: src.discharge.ui.page.list.DischargeList(self.notebook),
+            "console_editor": lambda **kwds: src.console.ui.page.script_editor.ScriptEditor(self.notebook),
             "pm_sample_set_editor": pm_sample_set_editor_def,
             "pm_test_series_editor": pm_test_series_editor_def,
             "rock_burst_editor": rock_burst_editor_def,
@@ -164,6 +167,7 @@ class MainWindow(wx.Frame):
             "tree": lambda args0, args1: True,
             "fms_tree": lambda args0, args1: True,
             "discharge_list": lambda args0, args1: True,
+            "console_editor": lambda args0, args1: True,
             "mine_object_editor": base_args_cmp,
             "rock_burst_editor": base_args_cmp,
             "station_editor": base_args_cmp,
@@ -204,10 +208,18 @@ class MainWindow(wx.Frame):
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_rock_bursts, id=ID_OPEN_ROCK_BURST_TREE)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_discharge_list, id=ID_OPEN_DISCHARGE)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_documents, id=ID_OPEN_DOCUMENTS)
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_open_console, id=ID_OPEN_CONSOLE)
         self.menu.Bind(wx.EVT_MENU, self.on_close_tab, id=wx.ID_CLOSE)
         self.menu.Bind(wx.EVT_MENU, self.on_next_tab, id=wx.ID_PREVIEW_NEXT)
         self.menu.Bind(wx.EVT_MENU, self.on_prev_tab, id=wx.ID_PREVIEW_PREVIOUS)
         self.menu.Bind(wx.EVT_MENU, self.on_open_settings, id=wx.ID_PROPERTIES)
+
+    def on_open_console(self, event):
+        _ctx = self.find_ctx_by_code("console_editor")
+        if _ctx is None:
+            self.open("console_editor")
+        else:
+            self.close(_ctx.o)
 
     def on_open_settings(self, event):
         self.setttings_wnd.ShowWindowModal()
@@ -372,6 +384,7 @@ class MainWindow(wx.Frame):
         self.toolbar.ToggleTool(ID_OPEN_ROCK_BURST_TREE, self.find_ctx_by_code("rock_burst_list") is not None)
         self.toolbar.ToggleTool(ID_OPEN_DISCHARGE, self.find_ctx_by_code("discharge_list") is not None)
         self.toolbar.ToggleTool(ID_OPEN_DOCUMENTS, self.find_ctx_by_code("documents_list") is not None)
+        self.toolbar.ToggleTool(ID_OPEN_CONSOLE, self.find_ctx_by_code("console_editor") is not None)
         self.menu.Enable(wx.ID_CLOSE, self.notebook.GetPageCount() > 0)
         self.menu.Enable(
             wx.ID_PREVIEW_NEXT,

@@ -8,7 +8,9 @@ from pony.orm import Database, DBException, db_session
 
 import src.database
 from src.config import Config, flush, load_from_file
+from src.console.database import connect as connect_local_scripts_database
 from src.ctx import app_ctx
+from src.resourcelocation import resource_path
 from src.ui.windows.login import LoginDialog
 from src.ui.windows.main import MainWindow
 from src.update import check_update_available, run_switch_version_script
@@ -37,7 +39,7 @@ if __name__ == "__main__":
     else:
         datadir = "~/.geomech"
     datadir = os.path.expanduser(os.path.expandvars(datadir))
-
+    app_ctx().datadir = datadir
     if not os.path.exists(datadir):
         os.mkdir(datadir)
     logging.basicConfig(
@@ -45,6 +47,8 @@ if __name__ == "__main__":
         level=logging.ERROR,  # Уровень логирования, чтобы записывать только ошибки
         format="%(asctime)s - %(levelname)s - %(message)s",  # Формат записи
     )
+
+    wx.Font.AddPrivateFont(resource_path("fonts/SourceCodePro-Regular.ttf"))
 
     config_filename = "%s/config.json" % datadir
     _is_runtime = False
@@ -69,7 +73,9 @@ if __name__ == "__main__":
     if getattr(sys, "frozen", False):
         # Проверяет наличие новой версии в переданом сервере обновлений
         if check_update_available(cfg.update_endpoint, cfg.update_appname, version_string):
-            ret = wx.MessageBox("Доступно обновление. Установить?", "Доступно обновление", style=wx.OK | wx.ICON_INFORMATION)
+            ret = wx.MessageBox(
+                "Доступно обновление. Установить?", "Доступно обновление", style=wx.OK | wx.ICON_INFORMATION
+            )
             if ret == wx.OK:
                 dlg = UpdateProcess(None, cfg.update_endpoint, cfg.update_appname)
                 dlg.start()
@@ -84,10 +90,23 @@ if __name__ == "__main__":
     _connection_failed = True
     # Тестируем поключение к базе данных
     # Если ошибка выдаем окно изменения доступов
-    if cfg.login is not None and cfg.password is not None and cfg.database is not None and cfg.host is not None and cfg.port is not None:
+    if (
+        cfg.login is not None
+        and cfg.password is not None
+        and cfg.database is not None
+        and cfg.host is not None
+        and cfg.port is not None
+    ):
         try:
             db = Database()
-            db.bind(provider="postgres", user=cfg.login, password=cfg.password, host=cfg.host, port=cfg.port, database=cfg.database)
+            db.bind(
+                provider="postgres",
+                user=cfg.login,
+                password=cfg.password,
+                host=cfg.host,
+                port=cfg.port,
+                database=cfg.database,
+            )
             with db_session:
                 db.execute('SELECT * FROM "DischargeMeasurements" LIMIT 1')
         except DBException as e:
@@ -112,9 +131,13 @@ if __name__ == "__main__":
     else:
         _start_accept = True
 
+    connect_local_scripts_database()
+
     if _start_accept:
         cfg = app_ctx().config
-        src.database.connect(login=cfg.login, password=cfg.password, host=cfg.host, port=cfg.port, database=cfg.database)
+        src.database.connect(
+            login=cfg.login, password=cfg.password, host=cfg.host, port=cfg.port, database=cfg.database
+        )
         wnd = MainWindow()
         app_ctx().main = wnd
         app.SetTopWindow(wnd)
