@@ -1,67 +1,18 @@
 import logging
-from dataclasses import dataclass
-from datetime import date
-from time import sleep
-from typing import List
+from time import time
 
 import wx
-from pony.orm import db_session, rollback, select
+from pony.orm import db_session, select
 from wx.lib.gizmos.treelistctrl import TreeListCtrl
 
 from src.database import SuppliedData, SuppliedDataPart, is_entity
 from src.datetimeutil import decode_date
 from src.ui.icon import get_icon
-from src.ui.task import Task, TaskJob
+from src.ui.task import Task
 
-from .file import FileDialog
+from .delete import DeleteTask
+from .file import AddFileTask, FileDialog
 from .folder import FolderDialog
-
-
-class DeleteTask(TaskJob):
-    def __init__(self, entities):
-        self.entities = entities
-        super().__init__()
-
-    @db_session
-    def run(self):
-        self.set_progress(0, len(self.entities))
-        for index, o in enumerate(self.entities):
-            if self.cancel_event.isSet():
-                rollback()
-                return
-            if isinstance(o, SuppliedData):
-                _o = SuppliedData[o.RID]
-            elif isinstance(o, SuppliedDataPart):
-                _o = SuppliedDataPart[o.RID]
-            else:
-                rollback()
-                raise RuntimeError("Unexpected object type: %s", str(type(o)))
-            _o.delete()
-            self.set_progress(index + 1, len(self.entities))
-
-
-@dataclass
-class FileFields:
-    name: str
-    comment: str
-    data_date: date
-    filename: str
-
-
-class AddFileTask(TaskJob):
-    def __init__(self, files: List[FileFields]):
-        self.files = files
-        super().__init__()
-
-    @db_session
-    def run(self):
-        self.set_progress(0, len(self.files))
-        for index, o in enumerate(self.files):
-            if self.cancel_event.isSet():
-                rollback()
-                return
-
-            self.set_progress(index + 1, len(self.files))
 
 
 class SuppliedDataWidget(wx.Panel):
@@ -69,6 +20,10 @@ class SuppliedDataWidget(wx.Panel):
         self.o = None
         self.items = []
         super().__init__(parent)
+        self.start_pos = None
+        self.end_pos = None
+        self.overlay = wx.Overlay()
+        self.is_selecting = False
         self.sz = wx.BoxSizer(wx.VERTICAL)
         self.tb = wx.ToolBar(self, style=wx.TB_FLAT)
         self.tb.AddTool(wx.ID_FILE1, "Добавить папку", get_icon("folder-add"))
@@ -82,7 +37,7 @@ class SuppliedDataWidget(wx.Panel):
         self.icon_folder = self.image_list.Add(get_icon("folder"))
         self.icon_folder_open = self.image_list.Add(get_icon("folder-open"))
         self.icon_file = self.image_list.Add(get_icon("file"))
-        self.tree = TreeListCtrl(self, style=wx.TR_HIDE_ROOT)
+        self.tree = TreeListCtrl(self, agwStyle=wx.TR_DEFAULT_STYLE | wx.TR_MULTIPLE)
         self.tree.AddColumn("Название", width=450)
         self.tree.AddColumn("Тип", width=100)
         self.tree.AddColumn("Размер", width=80)
@@ -97,6 +52,7 @@ class SuppliedDataWidget(wx.Panel):
         self.SetSizer(self.sz)
         self.Layout()
         self.bind_all()
+        self.update_controls_state()
 
     def bind_all(self):
         self.tb.Bind(wx.EVT_TOOL, self.on_folder_add, id=wx.ID_FILE1)
@@ -105,26 +61,78 @@ class SuppliedDataWidget(wx.Panel):
         self.tb.Bind(wx.EVT_TOOL, self.on_delete, id=wx.ID_DELETE)
         self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_select)
         self.tree.Bind(wx.EVT_TREE_ITEM_RIGHT_CLICK, self.on_menu)
+        self.tree.Bind(wx.EVT_LEFT_DOWN, self.on_left_down)
+        self.tree.Bind(wx.EVT_MOTION, self.on_mouse_move)
+        self.tree.Bind(wx.EVT_LEFT_UP, self.on_left_up)
+
+    def on_left_down(self, event):
+        self.start_pos = event.GetPosition()
+        self.end_pos = self.start_pos
+        self.is_selecting = True
+        self.tree.CaptureMouse()
+
+    def on_mouse_move(self, event):
+        if self.is_selecting and event.Dragging() and event.LeftIsDown():
+            self.end_pos = event.GetPosition()
+            self.draw_selection()
+
+    def on_left_up(self, event):
+        if self.is_selecting:
+            if self.tree.HasCapture():
+                self.tree.ReleaseMouse()
+            self.overlay.Reset()
+            self.is_selecting = False
+            self.select_items_in_rect(wx.Rect(self.start_pos, self.end_pos))
+            self.Refresh()
+
+    def draw_selection(self):
+        """Рисует прямоугольник выделения"""
+        dc = wx.ClientDC(self.tree)
+        odc = wx.DCOverlay(self.overlay, dc)
+        odc.Clear()
+
+        rect = wx.Rect(self.start_pos, self.end_pos)
+        dc.SetPen(wx.Pen(wx.BLUE, 1, wx.PENSTYLE_DOT))
+        dc.SetBrush(wx.Brush(wx.Colour(0, 0, 255, 50)))  # Полупрозрачный синий
+        dc.DrawRectangle(rect)
+
+    def select_items_in_rect(self, rect):
+        """Выбирает элементы, попавшие в выделенную область"""
+        self.tree.UnselectAll()
+        item, _ = self.tree.GetFirstChild(self.tree.GetRootItem())
+        while item is not None and item.IsOk():
+            item_rect = self.tree.GetBoundingRect(item, textOnly=False)
+            if item_rect.IsEmpty():
+                item, _ = self.tree.GetNextChild(self.tree.GetRootItem(), _)
+                continue
+            if rect.Intersects(item_rect):
+                self.tree.SelectItem(item, True)
+                self.tree.SelectAllChildren(item)
+            item, _ = self.tree.GetNextChild(self.tree.GetRootItem(), _)
 
     def on_menu(self, event):
         m = wx.Menu()
         data = self.tree.GetItemPyData(self.tree.GetSelections().__getitem__(0))
-        if data is None:
-            # RootItem
-            i = m.Append(wx.ID_FILE1, "Добавить папку")
-            i.SetBitmap(get_icon("folder-add"))
-        elif isinstance(data, SuppliedData):
-            i = m.Append(wx.ID_FILE2, "Добавить файл")
-            i.SetBitmap(get_icon("file-add"))
-            i = m.Append(wx.ID_EDIT, "Изменить")
-            i.SetBitmap(get_icon("edit"))
+        if len(self.tree.GetSelections()) > 1:
             i = m.Append(wx.ID_DELETE, "Удалить")
             i.SetBitmap(get_icon("delete"))
-        elif isinstance(data, SuppliedDataPart):
-            i = m.Append(wx.ID_EDIT, "Изменить")
-            i.SetBitmap(get_icon("edit"))
-            i = m.Append(wx.ID_DELETE, "Удалить")
-            i.SetBitmap(get_icon("delete"))
+        else:
+            if data is None:
+                # RootItem
+                i = m.Append(wx.ID_FILE1, "Добавить папку")
+                i.SetBitmap(get_icon("folder-add"))
+            elif isinstance(data, SuppliedData):
+                i = m.Append(wx.ID_FILE2, "Добавить файл")
+                i.SetBitmap(get_icon("file-add"))
+                i = m.Append(wx.ID_EDIT, "Изменить")
+                i.SetBitmap(get_icon("edit"))
+                i = m.Append(wx.ID_DELETE, "Удалить")
+                i.SetBitmap(get_icon("delete"))
+            elif isinstance(data, SuppliedDataPart):
+                i = m.Append(wx.ID_EDIT, "Изменить")
+                i.SetBitmap(get_icon("edit"))
+                i = m.Append(wx.ID_DELETE, "Удалить")
+                i.SetBitmap(get_icon("delete"))
         m.Bind(wx.EVT_MENU, self.on_folder_add, id=wx.ID_FILE1)
         m.Bind(wx.EVT_MENU, self.on_file_add, id=wx.ID_FILE2)
         m.Bind(wx.EVT_MENU, self.on_edit, id=wx.ID_EDIT)
@@ -141,7 +149,19 @@ class SuppliedDataWidget(wx.Panel):
         data = self.tree.GetItemPyData(self.tree.GetSelections().__getitem__(0))
         dlg = FileDialog(self, is_new=True, parent_object=data)
         if dlg.ShowModal() == wx.ID_OK:
-            self.file_add_task = Task("идет добавление файлов...", "Добавление файлов", AddFileTask())
+            self.file_add_task = Task(
+                "идет добавление файлов...",
+                "Добавление файлов",
+                AddFileTask([dlg.fields]),
+                can_abort=False,
+                show_time=False,
+            )
+            try:
+                self.file_add_task.then(self.on_file_add_resolve, self.on_file_add_reject)
+                self.file_add_task.run()
+            except Exception as e:
+                self.file_add_task.Destroy()
+                raise e
 
     def on_file_add_resolve(self, data):
         self.file_add_task.Destroy()
@@ -150,6 +170,7 @@ class SuppliedDataWidget(wx.Panel):
 
     def on_file_add_reject(self, e):
         self.file_add_task.Destroy()
+        raise e
 
     def on_edit(self, event):
         data = self.tree.GetItemPyData(self.tree.GetSelections().__getitem__(0))
@@ -215,7 +236,7 @@ class SuppliedDataWidget(wx.Panel):
             )
             self.tree.SetItemText(sp_item, "Папка", column=1)
             self.tree.SetItemText(sp_item, "---", column=2)
-            self.tree.SetItemText(sp_item, decode_date(sp.DataDate) if sp.DataDate is not None else "", column=3)
+            self.tree.SetItemText(sp_item, str(decode_date(sp.DataDate)) if sp.DataDate is not None else "", column=3)
             self.tree.SetItemText(sp_item, sp.Comment if sp.Comment is not None else "", column=4)
             self.items.append(sp)
             for sp_part in sp.parts:
@@ -223,7 +244,7 @@ class SuppliedDataWidget(wx.Panel):
                 self.tree.SetItemText(sp_part_item, "Файл", column=1)
                 self.tree.SetItemText(sp_part_item, "---", column=2)
                 self.tree.SetItemText(
-                    sp_part_item, decode_date(sp.DataDate) if sp.DataDate is not None else "", column=3
+                    sp_part_item, str(decode_date(sp.DataDate)) if sp.DataDate is not None else "", column=3
                 )
                 self.tree.SetItemText(sp_part_item, sp.Comment if sp.Comment is not None else "", column=4)
                 self.items.append(sp_part)
@@ -253,8 +274,11 @@ class SuppliedDataWidget(wx.Panel):
         valid_item = (
             len(self.tree.GetSelections()) == 1 and self.tree.GetSelections().__getitem__(0) != self.tree.GetRootItem()
         )
-        entity = self.tree.GetItemPyData(self.tree.GetSelections().__getitem__(0))
+        if len(self.tree.GetSelections()) == 1:
+            entity = self.tree.GetItemPyData(self.tree.GetSelections().__getitem__(0))
+        else:
+            entity = None
         self.tb.EnableTool(wx.ID_FILE1, self.o is not None and entity is None)
         self.tb.EnableTool(wx.ID_FILE2, self.o is not None and valid_item and isinstance(entity, SuppliedData))
         self.tb.EnableTool(wx.ID_EDIT, self.o is not None and valid_item)
-        self.tb.EnableTool(wx.ID_DELETE, self.o is not None and valid_item)
+        self.tb.EnableTool(wx.ID_DELETE, self.o is not None and len(self.tree.GetSelections()) > 0)
