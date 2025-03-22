@@ -1,5 +1,4 @@
 import logging
-from time import time
 
 import wx
 from pony.orm import db_session, select
