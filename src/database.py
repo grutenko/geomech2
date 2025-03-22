@@ -11,7 +11,7 @@ def connect(login: str, password: str, host: str, port: int = 5432, database: st
 
 def is_entity(o: object) -> bool:
     global db
-    return isinstance(o, db)
+    return isinstance(o, db.Entity)
 
 
 class MineObject(db.Entity):
@@ -41,8 +41,18 @@ class MineObject(db.Entity):
     Z_Max = Required(float, column="Z_Max")
 
     def get_tree_name(self):
-        _m = {"REGION": "Регион", "ROCKS": "Горный массив", "FIELD": "Месторождение", "HORIZON": "Горизонт", "EXCAVATION": "Выработка"}
+        _m = {
+            "REGION": "Регион",
+            "ROCKS": "Горный массив",
+            "FIELD": "Месторождение",
+            "HORIZON": "Горизонт",
+            "EXCAVATION": "Выработка",
+        }
         return "[%s] %s" % (_m[self.Type], self.Name)
+
+    @property
+    def sp_own_type(self):
+        return "MINE_OBJECT"
 
 
 class CoordSystem(db.Entity):
@@ -76,6 +86,10 @@ class CoordSystem(db.Entity):
     Z_Y = Required(float, column="Z_Y")
     Z_Z = Required(float, column="Z_Z")
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class Station(db.Entity):
     _table_ = "Stations"
@@ -96,6 +110,10 @@ class Station(db.Entity):
 
     def get_tree_name(self):
         return "[Станция] %s" % self.Name
+
+    @property
+    def sp_own_type(self):
+        return "STATION"
 
 
 class BoreHole(db.Entity):
@@ -123,6 +141,10 @@ class BoreHole(db.Entity):
     def get_tree_name(self):
         return "[Скважина] %s" % self.Name
 
+    @property
+    def sp_own_type(self):
+        return "BORE_HOLE"
+
 
 class OrigSampleSet(db.Entity):
     _table_ = "OrigSampleSets"
@@ -149,6 +171,10 @@ class OrigSampleSet(db.Entity):
         _m = {"CORE": "Керн", "STUFF": "Штуф", "DISPERCE": "Дисперсный материал"}
         return "[%s] %s" % (_m[self.SampleType], self.Name)
 
+    @property
+    def sp_own_type(self):
+        return "ORIG_SAMPLE_SET"
+
 
 class FoundationDocument(db.Entity):
     _table_ = "FoundationDocuments"
@@ -168,6 +194,10 @@ class FoundationDocument(db.Entity):
     @property
     def Name(self):
         return self.Number
+
+    @property
+    def sp_own_type(self):
+        return "FOUNDATION_DOC"
 
 
 class DischargeSeries(db.Entity):
@@ -222,6 +252,10 @@ class DischargeMeasurement(db.Entity):
     E4 = Required(float, column="E4")
     Rotate = Required(float, column="Rotate")
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class SuppliedData(db.Entity):
     _table_ = "SuppliedData"
@@ -249,6 +283,10 @@ class SuppliedDataPart(db.Entity):
     FileName = Required(str, column="FileName")
     DataContent = Required(bytes, column="DataContent", lazy=True)
     DataDate = Optional(int, column="DataDate", size=64)
+
+    @property
+    def sp_own_type(self):
+        return None
 
 
 class RockBurst(db.Entity):
@@ -283,6 +321,10 @@ class RockBurst(db.Entity):
     def get_tree_name(self):
         return "[Горный удар] №%s %s" % (self.Number, self.mine_object.Name)
 
+    @property
+    def sp_own_type(self):
+        return "ROCK_BURST"
+
 
 class RBASKSMEvent(db.Entity):
     _table_ = "RBASKSMEvents"
@@ -313,6 +355,10 @@ class RBGSRASEvent(db.Entity):
     Comment = Optional(str, column="Comment")
     GSRAS_ID = Required(str, column="GSRAS_ID")
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class RBTypicalPreventAction(db.Entity):
     _table_ = "RBTypicalPreventActions"
@@ -322,6 +368,10 @@ class RBTypicalPreventAction(db.Entity):
     RID = PrimaryKey(int, auto=True, column="RID")
     Name = Required(str, column="Name")
     Comment = Optional(str, column="Comment")
+
+    @property
+    def sp_own_type(self):
+        return None
 
 
 class RBTypicalSign(db.Entity):
@@ -333,6 +383,10 @@ class RBTypicalSign(db.Entity):
     Name = Required(str, column="Name")
     Comment = Optional(str, column="Comment")
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class RBTypicalCause(db.Entity):
     _table_ = "RBTypicalCauses"
@@ -343,6 +397,10 @@ class RBTypicalCause(db.Entity):
     Name = Required(str, column="Name")
     Comment = Optional(str, column="Comment")
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class RBCause(db.Entity):
     _table_ = "RBCauses"
@@ -352,6 +410,10 @@ class RBCause(db.Entity):
 
     RID = PrimaryKey(int, auto=True, column="RID")
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class RBSign(db.Entity):
     _table_ = "RBSigns"
@@ -360,6 +422,10 @@ class RBSign(db.Entity):
     rock_burst = Required(RockBurst, column="RBID")
 
     RID = PrimaryKey(int, auto=True, column="RID")
+
+    @property
+    def sp_own_type(self):
+        return None
 
 
 class RBType(db.Entity):
@@ -371,6 +437,10 @@ class RBType(db.Entity):
     Name = Required(str, column="Name")
     Comment = Optional(str, column="Comment")
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class RBPreventAction(db.Entity):
     _table_ = "RBPreventActions"
@@ -380,6 +450,10 @@ class RBPreventAction(db.Entity):
 
     RID = PrimaryKey(int, auto=True, column="RID")
     ActDate = Optional(int, column="ActDate", size=64)
+
+    @property
+    def sp_own_type(self):
+        return None
 
 
 class CoreBoxStorage(db.Entity):
@@ -392,6 +466,10 @@ class CoreBoxStorage(db.Entity):
     StartPosition = Required(int, column="StartPosition")
     EndPosition = Required(int, column="EndPosition")
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class Petrotype(db.Entity):
     _table_ = "Petrotypes"
@@ -401,6 +479,10 @@ class Petrotype(db.Entity):
     RID = PrimaryKey(int, auto=True, column="RID")
     Name = Required(str, column="Name")
     Comment = Optional(str, column="Comment")
+
+    @property
+    def sp_own_type(self):
+        return None
 
 
 class PetrotypeStruct(db.Entity):
@@ -412,6 +494,10 @@ class PetrotypeStruct(db.Entity):
     RID = PrimaryKey(int, auto=True, column="RID")
     Name = Required(str, column="Name")
     Comment = Optional(str, column="Comment")
+
+    @property
+    def sp_own_type(self):
+        return None
 
 
 class PMTestSeries(db.Entity):
@@ -431,6 +517,10 @@ class PMTestSeries(db.Entity):
 
     def get_tree_name(self):
         return "[Набор испытаний] " + self.Name
+
+    @property
+    def sp_own_type(self):
+        return "PM_TEST_SERIES"
 
 
 class PMSampleSet(db.Entity):
@@ -458,6 +548,10 @@ class PMSampleSet(db.Entity):
     def Name(self):
         return self.Number
 
+    @property
+    def sp_own_type(self):
+        return "PM_SAMPLE_SET"
+
 
 class PMSample(db.Entity):
     _table_ = "PMSamples"
@@ -484,6 +578,10 @@ class PMSample(db.Entity):
     def get_tree_name(self):
         return "[Образец] " + self.Name
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class PmTestMethod(db.Entity):
     _table_ = "PMTestMethods"
@@ -498,6 +596,10 @@ class PmTestMethod(db.Entity):
     EndDate = Optional(int, column="EndDate", size=64)
     Analytic = Optional(bool, column="Analytic")
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class PmTestEquipment(db.Entity):
     _table_ = "PMTestEquipment"
@@ -510,6 +612,10 @@ class PmTestEquipment(db.Entity):
     SerialNo = Optional(str, column="SerialNo")
     StartDate = Required(int, column="StartDate", size=64)
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class PmPropertyClass(db.Entity):
     _table_ = "PMPropertyClasses"
@@ -519,6 +625,10 @@ class PmPropertyClass(db.Entity):
     RID = PrimaryKey(int, auto=True, column="RID")
     Name = Required(str, column="Name")
     Comment = Optional(str, column="Comment")
+
+    @property
+    def sp_own_type(self):
+        return None
 
 
 class PmProperty(db.Entity):
@@ -534,6 +644,10 @@ class PmProperty(db.Entity):
     Code = Optional(str, column="Code")
     Unit = Optional(str, column="Unit")
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class PmSamplePropertyValue(db.Entity):
     _table_ = "PMSamplePropertyValues"
@@ -545,6 +659,10 @@ class PmSamplePropertyValue(db.Entity):
     RID = PrimaryKey(int, auto=True, column="RID")
     Value = Required(float, column="Value")
 
+    @property
+    def sp_own_type(self):
+        return None
+
 
 class PmPerformedTask(db.Entity):
     _table_ = "PMPerformedTasks"
@@ -552,6 +670,10 @@ class PmPerformedTask(db.Entity):
     RID = PrimaryKey(int, auto=True, column="RID")
     Name = Required(str, column="Name")
     Comment = Optional(str, column="Comment")
+
+    @property
+    def sp_own_type(self):
+        return None
 
 
 class PmSampleSetUsedProperties(db.Entity):
@@ -567,3 +689,7 @@ class PmSampleSetUsedProperties(db.Entity):
     @property
     def Name(self):
         return self.pm_property.Name
+
+    @property
+    def sp_own_type(self):
+        return None

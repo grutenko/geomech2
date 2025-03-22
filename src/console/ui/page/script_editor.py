@@ -5,6 +5,7 @@ import sys
 
 import wx
 import wx.lib.agw.flatnotebook
+import wx.lib.newevent
 import wx.stc as stc
 from pony.orm import commit, db_session, rollback, select, show
 
@@ -132,7 +133,7 @@ class _LocalFileNode(TreeNode):
     @db_session
     def get_parent(self):
         if self.o.folder is not None:
-            return Folder[self.o.folder.id]
+            return _LocalFolderNode(Folder[self.o.folder.id])
         return _LocalSectionNode()
 
     def get_name(self):
@@ -158,7 +159,7 @@ class _LocalFolderNode(TreeNode):
     @db_session
     def get_parent(self):
         if self.o.parent is not None:
-            return Folder[self.o.parent.id]
+            return _LocalFolderNode(Folder[self.o.parent.id])
         return _LocalSectionNode()
 
     def get_icon(self):
@@ -226,6 +227,12 @@ class _RootNode(TreeNode):
         return isinstance(node, _RootNode)
 
 
+import wx.lib.newevent
+
+FileSelectEvent, EVT_FILE_SELECT = wx.lib.newevent.NewEvent()
+FileDeleteEvent, EVT_FILE_DELETE = wx.lib.newevent.NewEvent()
+
+
 class ScriptsTree(wx.Panel):
     def __init__(self, parent):
         super().__init__(parent)
@@ -259,7 +266,7 @@ class ScriptsTree(wx.Panel):
 
     def on_tree_activate(self, event):
         if isinstance(event.node, _LocalFileNode):
-            ...
+            wx.PostEvent(self, FileSelectEvent(file=event.node.o))
 
     def on_tree_menu(self, event):
         m = wx.Menu()
@@ -308,15 +315,35 @@ class ScriptsTree(wx.Panel):
                 parent = None
             elif isinstance(parent_node, _LocalFolderNode):
                 parent = Folder[parent_node.o.id]
+            if (
+                select(o for o in Folder if o.name == name and o.parent == parent).count() > 0
+                or select(o for o in File if o.name == name and o.folder == parent).count() > 0
+            ):
+                raise RuntimeError("Элемент с таким названием уже существует в этом расположении.")
             o = Folder(name=name, parent=parent)
             commit()
             self.tree.soft_reload_childrens(parent_node)
             self.tree.select_node(_LocalFolderNode(o))
 
+    @db_session
     def add_file(self, parent_node):
         dlg = wx.TextEntryDialog(self, "Введите название файла", "Создание файла")
         dlg.SetIcon(wx.Icon(get_icon("file-add")))
-        dlg.ShowModal()
+        if dlg.ShowModal() == wx.ID_OK:
+            name = dlg.GetValue()
+            if isinstance(parent_node, _LocalSectionNode):
+                parent = None
+            elif isinstance(parent_node, _LocalFolderNode):
+                parent = Folder[parent_node.o.id]
+            if (
+                select(o for o in Folder if o.name == name and o.parent == parent).count() > 0
+                or select(o for o in File if o.name == name and o.folder == parent).count() > 0
+            ):
+                raise RuntimeError("Элемент с таким названием уже существует в этом расположении.")
+            o = File(name=name, folder=parent, content="# script file")
+            commit()
+            self.tree.soft_reload_childrens(parent_node)
+            self.tree.select_node(_LocalFileNode(o))
 
     def on_delete(self, event):
         self.delete(self.tree.get_current_node())
@@ -324,9 +351,19 @@ class ScriptsTree(wx.Panel):
     @db_session
     def delete(self, node):
         if isinstance(node, _LocalFolderNode):
-            Folder[node.o.id].delete()
+
+            def r(p):
+                for o in p.folders:
+                    r(o)
+                for o in p.files:
+                    o.delete()
+                    wx.PostEvent(self, FileDeleteEvent(file=o))
+                p.delete()
+
+            r(Folder[node.o.id])
         elif isinstance(node, _LocalFileNode):
             File[node.o.id].delete()
+            wx.PostEvent(self, FileDeleteEvent(file=node.o))
         self.tree.soft_reload_childrens(node.get_parent())
 
     def update_controls_state(self):
@@ -338,6 +375,9 @@ class ScriptsTree(wx.Panel):
             wx.ID_FILE2, node is not None and isinstance(node, (_LocalSectionNode, _LocalFolderNode))
         )
         self.toolbar.Realize()
+
+
+import logging
 
 
 class CodeEditor(stc.StyledTextCtrl):
@@ -406,7 +446,10 @@ class CodeEditor(stc.StyledTextCtrl):
         if (
             char.isalpha() and "A" <= char.upper() <= "Z" or (char >= "0" and char <= "9") or char == "."
         ):  # Автодополнение при вводе букв или точки
-            self.show_autocomplete()
+            try:
+                self.show_autocomplete()
+            except Exception as e:
+                logging.exception(e)
         event.Skip()
 
     def show_autocomplete(self):
@@ -508,10 +551,14 @@ class ResultsTable(wx.Panel):
         self.grid._render()
 
 
+import os
+
+
 class ScriptEditor(wx.Panel):
     def __init__(self, parent):
         global globals
         super().__init__(parent)
+        self.file = None
         # Подключаемся к локальной sqlite базе данных скриптов
         sz = wx.BoxSizer(wx.VERTICAL)
         self.horsplitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)
@@ -527,6 +574,9 @@ class ScriptEditor(wx.Panel):
         self.toolbar.Realize()
         p_sz.Add(self.toolbar, 0, wx.EXPAND)
         self.editor = CodeEditor(p)
+        if os.path.exists(app_ctx().datadir + "/console_cache.txt"):
+            with open(app_ctx().datadir + "/console_cache.txt", "r") as f:
+                self.editor.SetValue(f.read())
         p_sz.Add(self.editor, 1, wx.EXPAND)
         p.SetSizer(p_sz)
         self.result = wx.lib.agw.flatnotebook.FlatNotebook(self.splitter)
@@ -543,8 +593,29 @@ class ScriptEditor(wx.Panel):
         sz.Add(self.horsplitter, 1, wx.EXPAND)
         self.SetSizer(sz)
         self.Layout()
+        self.tree.Bind(EVT_FILE_SELECT, self.on_file_select)
+        self.tree.Bind(EVT_FILE_DELETE, self.on_file_delete)
 
         self.stdout = ""
+
+    def on_file_delete(self, event):
+        if self.file is not None and self.file.id == event.file.id:
+            self.file = None
+            self.editor.SetValue("")
+            self.update_controls_state()
+
+    def on_file_select(self, event):
+        if self.file is not None and self.file.id == self.file.id:
+            return
+        if self.file is not None or len(self.editor.GetValue()) > 0:
+            ret = wx.MessageBox(
+                "Текущиие изменения будут отменены.", "Подтеердите открытие", style=wx.OK | wx.ICON_ASTERISK
+            )
+            if ret != wx.OK:
+                return
+        self.file = event.file
+        self.editor.SetValue(event.file.content)
+        self.update_controls_state()
 
     def on_run(self, event):
         self.run()
@@ -594,11 +665,13 @@ class ScriptEditor(wx.Panel):
 
     def on_close(self):
         if len(self.editor.GetText()) > 0:
-            ret = wx.MessageBox(
-                "Редактор имеет несохраненные изменения которые будут утеряны. Закрыть?",
-                "Подтвердите закрытие",
-                style=wx.OK | wx.CANCEL | wx.ICON_ASTERISK,
-            )
+            ret = wx.MessageBox("Закрыть?", "Подтвердите закрытие", style=wx.OK | wx.CANCEL | wx.ICON_ASTERISK)
             if ret != wx.OK:
                 return False
+        with open(app_ctx().datadir + "/console_cache.txt", "w+") as f:
+            f.write(self.editor.GetValue())
         return True
+
+    def update_controls_state(self):
+        self.toolbar.EnableTool(wx.ID_SAVE, self.file is not None)
+        self.toolbar.Realize()

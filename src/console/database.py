@@ -18,7 +18,7 @@ def connect():
 class Folder(db.Entity):
     _table_ = "folder"
 
-    name = Required(str, unique=True)
+    name = Required(str)
     parent = Optional("Folder")
     folders = Set("Folder")
     files = Set("File")

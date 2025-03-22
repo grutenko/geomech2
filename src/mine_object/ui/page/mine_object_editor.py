@@ -6,8 +6,8 @@ from pony.orm import commit, db_session, select
 from src.ctx import app_ctx
 from src.database import CoordSystem, MineObject
 from src.mine_object.ui.choice import Choice as MineObjectChoice
+from src.ui._supplied_data import SuppliedDataWidget
 from src.ui.icon import get_icon
-from src.ui.supplied_data import SuppliedDataWidget
 from src.ui.validators import TextValidator
 
 
@@ -85,7 +85,7 @@ class MineObjectEditor(wx.Panel):
 
         self.load_choices()
         if not self.is_new:
-            self.supplied_data.start(self.o, _type="MINE_OBJECT")
+            self.supplied_data.start(self.o)
         self.bind_all()
         if not self.is_new:
             self.field_mine_object.Disable()

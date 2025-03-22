@@ -141,7 +141,12 @@ class CreateFileWorker(threading.Thread):
     @db_session
     def run(self):
         try:
-            _fields = {"Name": self.fields["name"], "Comment": self.fields["comment"], "FileName": self.fields["file_name"], "DType": self.fields["mime_type"]}
+            _fields = {
+                "Name": self.fields["name"],
+                "Comment": self.fields["comment"],
+                "FileName": self.fields["file_name"],
+                "DType": self.fields["mime_type"],
+            }
             _fields["parent"] = SuppliedData[self.fields["parent"].RID]
             if "data_date" in self.fields:
                 _fields["DataDate"] = self.fields["data_date"]
@@ -325,6 +330,31 @@ class FileEditor(wx.Dialog):
             event.Skip()
 
 
+class FileDropTarget(wx.FileDropTarget):
+    def __init__(self, list):
+        super().__init__()
+        self.list = list
+
+    def OnEnter(self, x, y, d):
+        hittest = self.list.HitTest(wx.Point(x, y))
+        print(int(hittest))
+        item = hittest.GetItem()
+        column = hittest.GetColumn()
+        if item.IsOk():
+            entity = self.list.GetItemData(item)
+            if isinstance(entity, SuppliedDataPart):
+                item = self.list.GetItemParent(item)
+            entity = self.list.GetItemData(item)
+            self.list.Select(item)
+        return d
+
+    def OnDropFiles(self, x, y, filenames):
+        item, _ = self.list.HitTest((x, y))
+        if item.IsOk():
+            print(f"Файлы {filenames} добавлены в {self.tree.GetItemText(item)}")
+        return True
+
+
 class SuppliedDataWidget(wx.Panel):
     def __init__(self, parent, deputy_text=None):
         super().__init__(parent)
@@ -379,6 +409,7 @@ class SuppliedDataWidget(wx.Panel):
 
         self.list.Bind(wx.dataview.EVT_TREELIST_SELECTION_CHANGED, self._on_selection_changed)
         self.list.Bind(wx.dataview.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self._on_item_contenxt_menu)
+        self.list.SetDropTarget(FileDropTarget(self.list))
 
         self.Layout()
 
