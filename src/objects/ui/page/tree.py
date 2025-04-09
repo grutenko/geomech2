@@ -652,7 +652,7 @@ class _TreeWidget(TreeWidget):
         self.Bind(EVT_WIDGET_TREE_ACTIVATED, self._on_node_activated)
         pubsub.pub.subscribe(self.on_objects_changed, "object.added")
 
-    def on_objects_changed(self, o):
+    def make_node(self, o):
         node = None
         if isinstance(o, MineObject):
             node = _MineObject_Node(o)
@@ -700,8 +700,6 @@ class _TreeWidget(TreeWidget):
             return _Station_Node(o)
         elif isinstance(o, BoreHole):
             return _BoreHole_Node(o)
-        elif isinstance(o, OrigSampleSet) and o.bore_hole is not None:
-            return _Core_Node(o)
         return None
 
     @db_session
@@ -965,8 +963,6 @@ class _TreeWidget(TreeWidget):
             node = _Station_Node(o)
         elif isinstance(o, BoreHole):
             node = _BoreHole_Node(o)
-        elif isinstance(o, OrigSampleSet) and o.SampleType == "CORE":
-            node = _Core_Node(o)
         else:
             return
         self.soft_reload_node(node)
