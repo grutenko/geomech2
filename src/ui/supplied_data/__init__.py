@@ -1,1 +1,1 @@
-from .supplied_data import SuppliedDataWidget
+from .supplied_data import SuppliedDataWidget  # noqa: F401

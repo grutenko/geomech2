@@ -2,6 +2,7 @@ import wx
 import wx.propgrid
 
 from src.ui.icon import get_icon
+from src.ui.overlay import Overlay
 
 
 class PropertiesWidget(wx.Panel):
@@ -47,15 +48,20 @@ class SamplesWidget(wx.Panel):
         self.SetSizer(sz)
         self.Layout()
         self.Disable()
+        self.overlay = Overlay(self)
+        self.overlay.Show()
 
     def start(self, o):
         self.o = o
         self.Enable()
         self.update_controls_state()
+        self.overlay.Hide()
 
     def end(self):
         self.o = None
         self.Disable()
         self.update_controls_state()
+        self.overlay.Show()
+        self.overlay.Raise()
 
     def update_controls_state(self): ...

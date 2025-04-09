@@ -1,535 +1,367 @@
-import mimetypes
+import logging
 import os
-import threading
-from datetime import datetime
+from pathlib import Path
 
 import wx
-import wx.dataview
-from pony.orm import commit, db_session, select
-from transliterate import translit
-
-from src.database import SuppliedData, SuppliedDataPart
-from src.datetimeutil import decode_date, encode_date
-from src.delete_object import delete_object
-from src.resourcelocation import resource_path
-from src.ui.icon import get_art, get_icon
-from src.ui.validators import DateValidator, TextValidator
-
-
-class FolderEditor(wx.Dialog):
-    def __init__(self, parent, own_id=None, own_type=None, o=None):
-        super().__init__(parent)
-        self.CenterOnScreen()
-
-        if o is None:
-            self.own_id = own_id
-            self.own_type = own_type
-            self.SetTitle("Добавить раздел")
-        else:
-            self.SetTitle("Изменить раздел: %s" % o.Name)
-
-        self.SetIcon(wx.Icon(get_icon("folder-add")))
-
-        self.o = o
-
-        top_sizer = wx.BoxSizer(wx.VERTICAL)
-        main_sizer = wx.BoxSizer(wx.VERTICAL)
-        top_sizer.Add(main_sizer, 1, wx.EXPAND | wx.ALL, border=10)
-
-        label = wx.StaticText(self, label="Название *")
-        main_sizer.Add(label, 0, wx.EXPAND)
-        self.field_name = wx.TextCtrl(self, size=wx.Size(250, -1))
-        self.field_name.SetValidator(TextValidator(lenMin=1, lenMax=128))
-        main_sizer.Add(self.field_name, 0, wx.EXPAND | wx.BOTTOM, border=10)
-        self.field_name.Bind(wx.EVT_KEY_UP, self._on_name_changed)
-
-        label = wx.StaticText(self, label="Номер")
-        main_sizer.Add(label, 0, wx.EXPAND)
-        self.field_number = wx.TextCtrl(self, size=wx.Size(250, -1))
-        self.field_number.SetValidator(TextValidator(lenMin=0, lenMax=32))
-        main_sizer.Add(self.field_number, 0, wx.EXPAND | wx.BOTTOM, border=10)
-
-        label = wx.StaticText(self, label="Датировка материала")
-        main_sizer.Add(label, 0, wx.EXPAND)
-        self.field_data_date = wx.TextCtrl(self, size=wx.Size(250, -1))
-        self.field_data_date.SetValidator(DateValidator(allow_empty=True))
-        main_sizer.Add(self.field_data_date, 0, wx.EXPAND | wx.BOTTOM, border=10)
-
-        collpane = wx.CollapsiblePane(self, wx.ID_ANY, "Комментарий")
-        main_sizer.Add(collpane, 0, wx.GROW)
-
-        comment_pane = collpane.GetPane()
-        comment_sizer = wx.BoxSizer(wx.VERTICAL)
-        comment_pane.SetSizer(comment_sizer)
-
-        label = wx.StaticText(comment_pane, label="Комментарий")
-        comment_sizer.Add(label, 0)
-        self.field_comment = wx.TextCtrl(comment_pane, size=wx.Size(250, 100), style=wx.TE_MULTILINE)
-        self.field_comment.SetValidator(TextValidator(lenMin=0, lenMax=512))
-        comment_sizer.Add(self.field_comment, 0, wx.EXPAND | wx.BOTTOM, border=10)
-
-        line = wx.StaticLine(self)
-        top_sizer.Add(line, 0, wx.EXPAND | wx.TOP, border=10)
-
-        btn_sizer = wx.StdDialogButtonSizer()
-        if o is None:
-            label = "Создать"
-        else:
-            label = "Изменить"
-        self.btn_save = wx.Button(self, label=label)
-        self.btn_save.Bind(wx.EVT_BUTTON, self._on_save)
-        self.btn_save.SetDefault()
-        btn_sizer.Add(self.btn_save, 0)
-        top_sizer.Add(btn_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, border=10)
-
-        self.SetSizer(top_sizer)
-
-        self.Layout()
-        self.Fit()
-
-        self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
-
-    def _on_name_changed(self, event):
-        event.Skip()
-        self.field_number.SetValue(translit(self.field_name.GetValue(), "ru", reversed=True))
-
-    def OnKeyUP(self, event):
-        keyCode = event.GetKeyCode()
-        if keyCode == wx.WXK_ESCAPE:
-            self.EndModal(wx.ID_CANCEL)
-        else:
-            event.Skip()
-
-    def _apply_fields(self):
-        self.field_name.SetValue(self.o.Name)
-        self.field_comment.SetValue(self.o.Comment if self.o.Comment is not None else "")
-        self.field_number.SetValue(self.o.Number if self.o.Number is not None else "")
-        self.field_data_date.SetValue(str(decode_date(self.o.DataDate)) if self.o.DataDate is not None else "")
-
-    @db_session
-    def _on_save(self, event):
-        if not self.Validate():
-            return
-
-        fields = {"Name": self.field_name.GetValue().strip(), "Comment": self.field_comment.GetValue().strip()}
-
-        if len(self.field_number.GetValue().strip()) > 0:
-            fields["Number"] = self.field_number.GetValue().strip()
-        if len(self.field_data_date.GetValue().strip()) > 0:
-            fields["DataDate"] = encode_date(self.field_data_date.GetValue().strip())
-
-        if self.o is None:
-            fields["OwnID"] = self.own_id
-            fields["OwnType"] = self.own_type
-            o = SuppliedData(**fields)
-        else:
-            o = SuppliedData[self.o.RID]
-            o.set(**fields)
-        commit()
-        self.o = o
-        self.EndModal(wx.ID_OK)
-
-
-class CreateFileWorker(threading.Thread):
-    def __init__(self, gauge, fields, on_resolve, on_reject):
-        super().__init__()
-        self.gauge = gauge
-        self.fields = fields
-        self.on_resolve = on_resolve
-        self.on_reject = on_reject
-
-    @db_session
-    def run(self):
-        try:
-            _fields = {
-                "Name": self.fields["name"],
-                "Comment": self.fields["comment"],
-                "FileName": self.fields["file_name"],
-                "DType": self.fields["mime_type"],
-            }
-            _fields["parent"] = SuppliedData[self.fields["parent"].RID]
-            if "data_date" in self.fields:
-                _fields["DataDate"] = self.fields["data_date"]
-
-            with open(self.fields["path"], "rb") as f:
-                _fields["DataContent"] = f.read()
-
-            o = SuppliedDataPart(**_fields)
-            commit()
-        except Exception as e:
-            self.on_reject(e)
-        else:
-            self.on_resolve(o)
-
-
-class FileEditor(wx.Dialog):
-    def __init__(self, parent, p=None, o=None):
-        super().__init__(parent)
-        self.CenterOnScreen()
-        self.o = None
-        self.p = None
-        if o is None:
-            self.p = p
-            self.SetTitle("Добавить файл")
-        else:
-            self.o = o
-            self.SetTitle("Изменить: %s" % o.Name)
-
-        self.SetIcon(wx.Icon(get_icon("file-add")))
-
-        top_sizer = wx.BoxSizer(wx.VERTICAL)
-        main_sizer = wx.BoxSizer(wx.VERTICAL)
-        top_sizer.Add(main_sizer, 1, wx.EXPAND | wx.ALL, border=10)
-
-        label = wx.StaticText(self, label="Файл *")
-        main_sizer.Add(label, 0, wx.EXPAND)
-        self.field_file = wx.FilePickerCtrl(self)
-        self.field_file.Bind(wx.EVT_FILEPICKER_CHANGED, self._on_file_changed)
-        main_sizer.Add(self.field_file, 0, wx.EXPAND)
-
-        self.label_file_error = wx.StaticText(self, label="Неверный путь к файлу")
-        self.label_file_error.SetForegroundColour(wx.Colour(255, 0, 0))
-        self.label_file_error.Hide()
-        main_sizer.Add(self.label_file_error, 0, wx.EXPAND)
-
-        label = wx.StaticText(self, label="Название *")
-        main_sizer.Add(label, 0, wx.EXPAND | wx.TOP, border=10)
-        self.field_name = wx.TextCtrl(self, size=wx.Size(250, -1))
-        self.field_name.SetValidator(TextValidator(lenMin=1, lenMax=128))
-        main_sizer.Add(self.field_name, 0, wx.EXPAND | wx.BOTTOM, border=10)
-
-        label = wx.StaticText(self, label="Датировка материала")
-        main_sizer.Add(label, 0, wx.EXPAND)
-        self.field_data_date = wx.TextCtrl(self, size=wx.Size(250, -1))
-        self.field_data_date.SetValidator(DateValidator())
-        main_sizer.Add(self.field_data_date, 0, wx.EXPAND | wx.BOTTOM, border=10)
-
-        collpane = wx.CollapsiblePane(self, wx.ID_ANY, "Комментарий")
-        main_sizer.Add(collpane, 0, wx.GROW)
-
-        comment_pane = collpane.GetPane()
-        comment_sizer = wx.BoxSizer(wx.VERTICAL)
-        comment_pane.SetSizer(comment_sizer)
-
-        label = wx.StaticText(comment_pane, label="Комментарий")
-        comment_sizer.Add(label, 0)
-        self.field_comment = wx.TextCtrl(comment_pane, size=wx.Size(250, 100), style=wx.TE_MULTILINE)
-        self.field_comment.SetValidator(TextValidator(lenMin=0, lenMax=512))
-        comment_sizer.Add(self.field_comment, 0, wx.EXPAND | wx.BOTTOM, border=10)
-
-        self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
-
-        line = wx.StaticLine(self)
-        top_sizer.Add(line, 0, wx.EXPAND | wx.TOP, border=10)
-
-        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
-
-        self.progress_timer = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self._on_tick_gauge)
-        self.progress = wx.Gauge(self)
-        btn_sizer.Add(self.progress, 1, wx.CENTER | wx.RIGHT, border=10)
-
-        if o is None:
-            label = "Создать"
-        else:
-            label = "Изменить"
-        self.btn_save = wx.Button(self, label=label)
-        self.btn_save.Bind(wx.EVT_BUTTON, self._on_save)
-        self.btn_save.SetDefault()
-        btn_sizer.Add(self.btn_save, 0)
-        top_sizer.Add(btn_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, border=10)
-
-        self.SetSizer(top_sizer)
-
-        self.Layout()
-        self.Fit()
-
-        self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
-
-        self._save_worker = None
-
-    def _on_tick_gauge(self, event):
-        self.progress.Pulse()
-
-    def _on_file_changed(self, event):
-        path = self.field_file.GetPath()
-        if len(path) == 0:
-            return
-
-        if os.path.exists(path):
-            self.field_name.SetValue(os.path.basename(path))
-            ctime = os.path.getctime(path)
-            ctime = datetime.fromtimestamp(ctime).strftime("%d.%m.%Y")
-            self.field_data_date.SetValue(ctime)
-            self.label_file_error.Hide()
-        else:
-            self.label_file_error.Show()
-
-        self.Layout()
-        self.Fit()
-
-    def _start_save(self):
-        path = self.field_file.GetPath()
-        _fields = {
-            "parent": self.p,
-            "path": path,
-            "name": self.field_name.GetValue(),
-            "comment": self.field_comment.GetValue(),
-            "file_name": os.path.basename(path),
-            "data_date": encode_date(self.field_data_date.GetValue()),
-        }
-        mime_type, _ = mimetypes.guess_type(path)
-        if mime_type is not None:
-            _fields["mime_type"] = mime_type
-        else:
-            _fields["mime_type"] = "application/octet-stream"
-        self._save_worker = CreateFileWorker(self.progress, _fields, self._on_resolve, self._on_reject)
-        self._save_worker.start()
-
-        self.progress_timer.Start(10)
-        self.field_file.Disable()
-        self.field_name.Disable()
-        self.field_comment.Disable()
-        self.field_data_date.Disable()
-        self.btn_save.Disable()
-
-    def _end_save(self):
-        self.field_file.Enable()
-        self.field_name.Enable()
-        self.field_comment.Enable()
-        self.field_data_date.Enable()
-        self.btn_save.Enable()
-        self.progress_timer.Stop()
-        self.progress.SetValue(0)
-
-    def _on_resolve(self, o):
-        wx.CallAfter(self._end_save)
-        self.o = o
-        wx.CallAfter(self.EndModal, wx.ID_OK)
-
-    def _on_reject(self, reason):
-        wx.CallAfter(self._end_save)
-        wx.MessageBox("Ошибка: %s" % str(reason), "Ошибка сохранения", wx.OK | wx.ICON_ERROR)
-
-    def _on_save(self, event):
-        if not self.Validate():
-            return
-
-        path = self.field_file.GetPath()
-        if len(path) == 0 or not os.path.exists(path):
-            wx.MessageBox("Файл не выбран", "Ошибка заполнения", style=wx.OK | wx.ICON_ERROR)
-            return
-
-        self._start_save()
-
-    def OnKeyUP(self, event):
-        keyCode = event.GetKeyCode()
-        if keyCode == wx.WXK_ESCAPE:
-            self.EndModal(wx.ID_CANCEL)
-        else:
-            event.Skip()
-
-
-class FileDropTarget(wx.FileDropTarget):
-    def __init__(self, list):
-        super().__init__()
-        self.list = list
-
-    def OnEnter(self, x, y, d):
-        hittest = self.list.HitTest(wx.Point(x, y))
-        print(int(hittest))
-        item = hittest.GetItem()
-        column = hittest.GetColumn()
-        if item.IsOk():
-            entity = self.list.GetItemData(item)
-            if isinstance(entity, SuppliedDataPart):
-                item = self.list.GetItemParent(item)
-            entity = self.list.GetItemData(item)
-            self.list.Select(item)
-        return d
-
-    def OnDropFiles(self, x, y, filenames):
-        item, _ = self.list.HitTest((x, y))
-        if item.IsOk():
-            print(f"Файлы {filenames} добавлены в {self.tree.GetItemText(item)}")
-        return True
+from pony.orm import db_session, select
+from wx.lib.gizmos.treelistctrl import TreeListCtrl
+
+from src.database import SuppliedData, SuppliedDataPart, is_entity
+from src.datetimeutil import decode_date
+from src.ui.icon import get_icon
+from src.ui.overlay import Overlay
+from src.ui.task import Task
+
+from .delete import DeleteTask
+from .download import DownloadItem, DownloadTask, sanitize_filename
+from .file import AddFileTask, FileDialog
+from .folder import FolderDialog
+
+
+def human_readable_size(num_bytes, precision=2):
+    units = ["Б", "КБ", "МБ", "ГБ", "ТБ", "ПБ"]
+    size = float(num_bytes)
+    for unit in units:
+        if size < 1024:
+            return f"{size:.{precision}f} {unit}"
+        size /= 1024
+    return f"{size:.{precision}f} ПБ"
 
 
 class SuppliedDataWidget(wx.Panel):
     def __init__(self, parent, deputy_text=None):
+        self.o = None
+        self.items = []
         super().__init__(parent)
-
-        main_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        self.toolbar = wx.ToolBar(self, style=wx.TB_FLAT)
-        item = self.toolbar.AddTool(wx.ID_ADD, "Добавить раздел", get_icon("folder-add"))
-        self.toolbar.EnableTool(wx.ID_ADD, False)
-        self.toolbar.Bind(wx.EVT_TOOL, self._on_create_folder, item)
-        item = self.toolbar.AddTool(wx.ID_FILE, "Добавить файл", get_icon("file-add"), kind=wx.ITEM_DROPDOWN)
-        self.toolbar.AddSeparator()
-        item = self.toolbar.AddTool(wx.ID_EDIT, "Изменить", get_icon("edit"))
-        self.toolbar.Bind(wx.EVT_TOOL, self.on_edit, id=wx.ID_EDIT)
-        self.toolbar.AddTool(wx.ID_DELETE, "Удалить", get_icon("delete"))
-        self.toolbar.Bind(wx.EVT_TOOL, self._on_delete, id=wx.ID_DELETE)
-        self.toolbar.EnableTool(wx.ID_EDIT, False)
-        self.toolbar.EnableTool(wx.ID_DELETE, False)
-        self.toolbar.AddStretchableSpace()
-        item = self.toolbar.AddTool(wx.ID_DOWN, "Скачать", get_icon("download"), kind=wx.ITEM_DROPDOWN)
-        self.toolbar.EnableTool(wx.ID_FILE, False)
-        self.toolbar.Realize()
-        main_sizer.Add(self.toolbar, 0, wx.EXPAND)
-
-        self.statusbar = wx.StatusBar(self, style=0)
-        main_sizer.Add(self.statusbar, 0, wx.EXPAND)
-
-        self._deputy = wx.Panel(self)
-        deputy_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.start_pos = None
+        self.end_pos = None
+        self.overlay = wx.Overlay()
+        self.is_selecting = False
+        self.sz = wx.BoxSizer(wx.VERTICAL)
+        self.tb = wx.ToolBar(self, style=wx.TB_FLAT)
+        self.tb.AddTool(wx.ID_DOWN, "Скачать", get_icon("download"), shortHelp="Скачать")
+        self.tb.AddTool(wx.ID_FILE1, "Добавить папку", get_icon("folder-add"), shortHelp="Добавить папку")
+        self.tb.AddTool(
+            wx.ID_FILE2, "Добавить файл", get_icon("file-add"), kind=wx.ITEM_DROPDOWN, shortHelp="Добавить файл"
+        )
+        self.tb.AddSeparator()
+        self.tb.AddTool(wx.ID_EDIT, "Изменить", get_icon("edit"), shortHelp="Изменить")
+        self.tb.AddTool(wx.ID_DELETE, "Удалить", get_icon("delete"), shortHelp="Удалить")
+        self.tb.Realize()
+        self.sz.Add(self.tb, 0, wx.EXPAND)
+        self.image_list = wx.ImageList(16, 16)
+        self.icon_book = self.image_list.Add(get_icon("book"))
+        self.icon_folder = self.image_list.Add(get_icon("folder"))
+        self.icon_folder_open = self.image_list.Add(get_icon("folder-open"))
+        self.icon_file = self.image_list.Add(get_icon("file"))
+        self.tree = TreeListCtrl(self, agwStyle=wx.TR_DEFAULT_STYLE | wx.TR_MULTIPLE)
+        self.tree.AddColumn("Название", width=450)
+        self.tree.AddColumn("Тип", width=100)
+        self.tree.AddColumn("Размер", width=80)
+        self.tree.AddColumn("Датировка", width=150)
+        self.tree.AddColumn("Комментарий", width=300)
+        self.tree.AssignImageList(self.image_list)
+        self.tree.Hide()
         if deputy_text is None:
-            deputy_text = "Недоступны для этого объекта"
-        label = wx.StaticText(self._deputy, label=deputy_text, style=wx.ST_ELLIPSIZE_MIDDLE)
-        deputy_sizer.Add(label, 1, wx.CENTER | wx.ALL, border=20)
-        self._deputy.SetSizer(deputy_sizer)
-        main_sizer.Add(self._deputy, 1, wx.EXPAND)
-
-        self._image_list = wx.ImageList(16, 16)
-        self._icons = {}
-        self.list = wx.dataview.TreeListCtrl(self, style=wx.dataview.TL_DEFAULT_STYLE | wx.BORDER_NONE)
-        self.list.AssignImageList(self._image_list)
-        self._icon_folder = self._image_list.Add(get_icon("folder"))
-        self._icon_folder_open = self._image_list.Add(get_icon("folder-open"))
-        self._icon_file = self._image_list.Add(get_art(wx.ART_NORMAL_FILE, scale_to=16))
-        self.list.AppendColumn("Название", 250)
-        self.list.AppendColumn("Тип", 50)
-        self.list.AppendColumn("Размер", 50)
-        self.list.AppendColumn("Датировка", 80)
-        self.list.Hide()
-
-        self.SetSizer(main_sizer)
-        self._main_sizer = main_sizer
-
-        self.list.Bind(wx.dataview.EVT_TREELIST_SELECTION_CHANGED, self._on_selection_changed)
-        self.list.Bind(wx.dataview.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self._on_item_contenxt_menu)
-        self.list.SetDropTarget(FileDropTarget(self.list))
-
+            deputy_text = "Недоступно"
+        self.deputy = wx.StaticText(self, label=deputy_text)
+        self.sz.Add(self.deputy, 1, wx.CENTER | wx.ALL, border=100)
+        self.SetSizer(self.sz)
         self.Layout()
+        self.bind_all()
+        self.update_controls_state()
+        self.disable_overlay = Overlay(self, deputy_text)
+        self.disable_overlay.Show()
 
-    def hide_target_name(self, hide=True):
-        if hide:
-            self.statusbar.Hide()
+    def bind_all(self):
+        self.tb.Bind(wx.EVT_TOOL, self.on_folder_add, id=wx.ID_FILE1)
+        self.tb.Bind(wx.EVT_TOOL, self.on_file_add, id=wx.ID_FILE2)
+        self.tb.Bind(wx.EVT_TOOL, self.on_edit, id=wx.ID_EDIT)
+        self.tb.Bind(wx.EVT_TOOL, self.on_delete, id=wx.ID_DELETE)
+        self.tb.Bind(wx.EVT_TOOL, self.on_download, id=wx.ID_DOWN)
+        self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_select)
+        self.tree.Bind(wx.EVT_TREE_ITEM_RIGHT_CLICK, self.on_menu)
+        self.tree.Bind(wx.EVT_LEFT_DOWN, self.on_left_down)
+        self.tree.Bind(wx.EVT_MOTION, self.on_mouse_move)
+        self.tree.Bind(wx.EVT_LEFT_UP, self.on_left_up)
+
+    def on_left_down(self, event):
+        self.start_pos = event.GetPosition()
+        self.end_pos = self.start_pos
+        self.is_selecting = True
+        self.tree.CaptureMouse()
+
+    def on_mouse_move(self, event):
+        if self.is_selecting and event.Dragging() and event.LeftIsDown():
+            self.end_pos = event.GetPosition()
+            self.draw_selection()
+
+    def on_left_up(self, event):
+        if self.is_selecting:
+            if self.tree.HasCapture():
+                self.tree.ReleaseMouse()
+            self.overlay.Reset()
+            self.is_selecting = False
+            self.select_items_in_rect(wx.Rect(self.start_pos, self.end_pos))
+            self.Refresh()
+
+    def draw_selection(self):
+        """Рисует прямоугольник выделения"""
+        dc = wx.ClientDC(self.tree)
+        odc = wx.DCOverlay(self.overlay, dc)
+        odc.Clear()
+
+        rect = wx.Rect(self.start_pos, self.end_pos)
+        dc.SetPen(wx.Pen(wx.BLUE, 1, wx.PENSTYLE_DOT))
+        dc.SetBrush(wx.Brush(wx.Colour(0, 0, 255, 50)))  # Полупрозрачный синий
+        dc.DrawRectangle(rect)
+
+    def select_items_in_rect(self, rect):
+        """Выбирает элементы, попавшие в выделенную область"""
+        self.tree.UnselectAll()
+        item, _ = self.tree.GetFirstChild(self.tree.GetRootItem())
+        while item is not None and item.IsOk():
+            item_rect = self.tree.GetBoundingRect(item, textOnly=False)
+            if item_rect.IsEmpty():
+                item, _ = self.tree.GetNextChild(self.tree.GetRootItem(), _)
+                continue
+            if rect.Intersects(item_rect):
+                self.tree.SelectItem(item, True)
+                self.tree.SelectAllChildren(item)
+            item, _ = self.tree.GetNextChild(self.tree.GetRootItem(), _)
+
+    def on_menu(self, event):
+        m = wx.Menu()
+        data = self.tree.GetItemPyData(self.tree.GetSelections().__getitem__(0))
+        if len(self.tree.GetSelections()) > 1:
+            i = m.Append(wx.ID_DELETE, "Удалить")
+            i.SetBitmap(get_icon("delete"))
         else:
-            self.statusbar.Show()
-        self.Layout()
+            if data is None:
+                # RootItem
+                i = m.Append(wx.ID_FILE1, "Добавить папку")
+                i.SetBitmap(get_icon("folder-add"))
+            elif isinstance(data, SuppliedData):
+                i = m.Append(wx.ID_FILE2, "Добавить файл")
+                i.SetBitmap(get_icon("file-add"))
+                i = m.Append(wx.ID_EDIT, "Изменить")
+                i.SetBitmap(get_icon("edit"))
+                i = m.Append(wx.ID_DELETE, "Удалить")
+                i.SetBitmap(get_icon("delete"))
+            elif isinstance(data, SuppliedDataPart):
+                i = m.Append(wx.ID_EDIT, "Изменить")
+                i.SetBitmap(get_icon("edit"))
+                i = m.Append(wx.ID_DELETE, "Удалить")
+                i.SetBitmap(get_icon("delete"))
+        m.Bind(wx.EVT_MENU, self.on_folder_add, id=wx.ID_FILE1)
+        m.Bind(wx.EVT_MENU, self.on_file_add, id=wx.ID_FILE2)
+        m.Bind(wx.EVT_MENU, self.on_edit, id=wx.ID_EDIT)
+        m.Bind(wx.EVT_MENU, self.on_delete, id=wx.ID_DELETE)
+        self.PopupMenu(m, event.GetPoint())
 
-    def _on_selection_changed(self, event):
-        self._update_controls_state()
-
-    def _on_create_folder(self, event):
-        dlg = FolderEditor(self, self.o.RID, self._type)
+    def on_folder_add(self, event):
+        dlg = FolderDialog(self, own_entity=self.o, is_new=True)
         if dlg.ShowModal() == wx.ID_OK:
-            self._render()
-        self._update_controls_state()
+            self.load()
+            self.update_controls_state()
 
-    def _on_create_file(self, event):
-        item = self.list.GetSelection()
-        o = self.list.GetItemData(item)
-        dlg = FileEditor(self, p=o)
-        if dlg.ShowModal() == wx.ID_OK:
-            self._render()
-        self._update_controls_state()
-
-    def _on_delete(self, event):
-        item = self.list.GetSelection()
-        o = self.list.GetItemData(item)
-        if isinstance(o, SuppliedData):
-            rel = ["parts"]
-        elif isinstance(o, SuppliedDataPart):
-            rel = []
-        else:
+    def on_download(self, event):
+        dlg = wx.DirDialog(self, "Выберите место сохранения")
+        if dlg.ShowModal() != wx.ID_OK:
             return
-        if delete_object(o, rel):
-            self._render()
-        self._update_controls_state()
+        items = []
 
-    def _on_item_contenxt_menu(self, event: wx.dataview.DataViewEvent):
-        item = event.GetItem()
-        menu = wx.Menu()
-        if not item.IsOk():
-            item = menu.Append(wx.ID_ADD, "Добавить раздел")
-            item.SetBitmap(get_icon("folder-add"))
-            menu.Bind(wx.EVT_MENU, self._on_create_folder, item)
-        else:
-            item = self.list.GetSelection()
-            if isinstance(self.list.GetItemData(item), SuppliedData):
-                item = menu.Append(wx.ID_EDIT, "Изменить раздел")
+        # Рекурсивно обходит все элементы дерева добавляя в список элементов на
+        # загрузку те - которые выделены пользователем
+        def r(p=None, path=None):
+            tree_items = []
+            if p is None:
+                tree_items.append(self.tree.GetRootItem())
             else:
-                item = menu.Append(wx.ID_EDIT, "Изменить файл")
-            menu.AppendSeparator()
-            item = menu.Append(wx.ID_ADD, "Добавить файл")
-            item.SetBitmap(get_icon("file-add"))
-            menu.Bind(wx.EVT_MENU, self._on_create_file, item)
-            item = menu.Append(wx.ID_DELETE, "Удалить")
-            menu.Bind(wx.EVT_MENU, self._on_delete, item)
-            item.SetBitmap(get_icon("delete"))
+                item, cookie = self.tree.GetFirstChild(p)
+                while item is not None:
+                    tree_items.append(item)
+                    item = self.tree.GetNextSibling(item)
 
-        self.PopupMenu(menu, event.GetPosition())
+            _once_selected = False
+            for item in tree_items:
+                if self.tree.IsSelected(item):
+                    _once_selected = True
+                    break
 
-    def on_edit(self, event): ...
+            for item in tree_items:
+                if not self.tree.IsSelected(item) and _once_selected:
+                    # пропускаем элементы которые не выделены, но при этом есть хотя бы один выделеный элемент в на у этого родителя
+                    # Иначе предполагается что пользователь выбрал все дочерние элементы
+                    continue
+                data = self.tree.GetItemPyData(item)
+                new_path = None
+                o = None
+                if data is None:
+                    new_path = sanitize_filename(self.o.get_tree_name())
+                elif isinstance(data, SuppliedData):
+                    new_path = os.path.join(path, sanitize_filename(data.Name))
+                elif isinstance(data, SuppliedDataPart):
+                    _path = Path(data.FileName)
+                    new_path = os.path.join(path, sanitize_filename(data.Name + "".join(_path.suffixes)))
+                    o = data
+                items.append(DownloadItem(new_path, o))
+                r(item, new_path)
 
-    def _apply_icon(self, icon_name, icon):
-        if icon_name not in self._icons:
-            self._icons[icon_name] = self._image_list.Add(icon)
-        return self._icons[icon_name]
+        r()
+        self.download_task = Task(
+            "Скачивание файлов", "Идет скачивание файлов", DownloadTask(items, dlg.GetPath()), self
+        )
+        try:
+            self.download_task.then(self.on_download_resolve, self.on_download_reject)
+            self.download_task.run()
+        except Exception:
+            self.download_task.Destroy()
+
+    def on_download_resolve(self, data):
+        self.download_task.Destroy()
+
+    def on_download_reject(self, e):
+        self.download_task.Destroy()
+        raise e
+
+    def on_file_add(self, event):
+        data = self.tree.GetItemPyData(self.tree.GetSelections().__getitem__(0))
+        dlg = FileDialog(self, is_new=True, parent_object=data)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.file_add_task = Task(
+                "идет добавление файлов...",
+                "Добавление файлов",
+                AddFileTask([dlg.fields]),
+                can_abort=False,
+                show_time=False,
+            )
+            try:
+                self.file_add_task.then(self.on_file_add_resolve, self.on_file_add_reject)
+                self.file_add_task.run()
+            except Exception as e:
+                self.file_add_task.Destroy()
+                raise e
+
+    def on_file_add_resolve(self, data):
+        self.file_add_task.Destroy()
+        self.load()
+        self.update_controls_state()
+
+    def on_file_add_reject(self, e):
+        self.file_add_task.Destroy()
+        raise e
+
+    def on_edit(self, event):
+        data = self.tree.GetItemPyData(self.tree.GetSelections().__getitem__(0))
+        if isinstance(data, SuppliedData):
+            dlg = FolderDialog(self, own_entity=self.o, is_new=False, o=data)
+        elif isinstance(data, SuppliedDataPart):
+            dlg = FileDialog(self, is_new=False, o=data)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.load()
+            self.update_controls_state()
 
     @db_session
-    def _render(self):
-        self.list.DeleteAllItems()
-        for o in select(o for o in SuppliedData if o.OwnID == self.o.RID and o.OwnType == self._type):
-            folder = self.list.AppendItem(self.list.GetRootItem(), o.Name, self._icon_folder, self._icon_folder_open, o)
-            self.list.SetItemText(folder, 1, "Папка")
-            self.list.SetItemText(folder, 2, "---")
-            for child in o.parts:
-                ext = child.FileName.split(".")[-1]
-                if ext == "xlsx":
-                    ext = "xls"
-                icon_path = resource_path("icons/%s.png" % ext)
-                if os.path.exists(icon_path):
-                    _icon = self._apply_icon(ext, wx.Bitmap(icon_path))
-                else:
-                    _icon = self._icon_file
-                file = self.list.AppendItem(folder, child.Name, _icon, _icon, child)
-                self.list.SetItemText(file, 1, child.FileName.split(".")[-1])
-                self.list.SetItemText(file, 2, "---")
-            self.list.Expand(folder)
+    def on_delete(self, event):
+        if (
+            wx.MessageBox(
+                "Вы действительно хотите удалить сопутствующие материалы?",
+                "Подтвердите удаление",
+                style=wx.YES | wx.NO | wx.CANCEL | wx.NO_DEFAULT | wx.ICON_INFORMATION,
+            )
+            != wx.YES
+        ):
+            return
+        entities = set()
+        for item in self.tree.GetSelections():
+            data = self.tree.GetItemPyData(item)
+            if isinstance(data, SuppliedData):
+                sp = SuppliedData[data.RID]
+                entities.add(sp)
+                for o in sp.parts:
+                    entities.add(o)
+            else:
+                entities.add(SuppliedDataPart[data.RID])
 
-    def _update_controls_state(self):
-        self.toolbar.EnableTool(wx.ID_ADD, self.o is not None)
-        item = self.list.GetSelection()
-        folder_selected = False
-        if item.IsOk():
-            folder_selected = isinstance(self.list.GetItemData(item), SuppliedData)
-        self.toolbar.EnableTool(wx.ID_FILE, folder_selected)
-        self.toolbar.EnableTool(wx.ID_EDIT, folder_selected)
-        self.toolbar.EnableTool(wx.ID_DELETE, folder_selected)
+        self.delete_task = Task(
+            "Удаление", "идет удаление сопутствующих материалов...", DeleteTask(entities), self, can_abort=True
+        )
+        try:
+            self.delete_task.then(self.on_delete_resolve, self.on_delete_reject)
+            self.delete_task.run()
+        except Exception as e:
+            self.delete_task.Destroy()
+            raise e
 
-    def start(self, o, _type):
+    def on_delete_resolve(self, data):
+        self.delete_task.Destroy()
+        self.load()
+        self.update_controls_state()
+
+    def on_delete_reject(self, e):
+        self.delete_task.Destroy()
+
+    def on_select(self, event):
+        self.update_controls_state()
+
+    @db_session
+    def load(self):
+        self.tree.DeleteAllItems()
+        self.items = []
+        self.tree_root = self.tree.AddRoot(self.o.get_tree_name(), image=self.icon_book, selImage=self.icon_book)
+        for sp in select(o for o in SuppliedData if o.OwnID == self.o.RID and o.OwnType == self.o.sp_own_type):
+            sp_item = self.tree.AppendItem(
+                self.tree_root, sp.Name, image=self.icon_folder, selImage=self.icon_folder_open, data=sp
+            )
+            self.tree.SetItemText(sp_item, "Папка", column=1)
+            self.tree.SetItemText(sp_item, "---", column=2)
+            self.tree.SetItemText(sp_item, str(decode_date(sp.DataDate)) if sp.DataDate is not None else "", column=3)
+            self.tree.SetItemText(sp_item, sp.Comment if sp.Comment is not None else "", column=4)
+            self.items.append(sp)
+            for sp_part in select(o for o in SuppliedDataPart if o.parent == sp):
+                sp_part_item = self.tree.AppendItem(sp_item, sp_part.Name, image=self.icon_file, data=sp_part)
+                self.tree.SetItemText(sp_part_item, "Файл", column=1)
+                self.tree.SetItemText(sp_part_item, human_readable_size(sp_part.size()), column=2)
+                self.tree.SetItemText(
+                    sp_part_item, str(decode_date(sp_part.DataDate)) if sp_part.DataDate is not None else "", column=3
+                )
+                self.tree.SetItemText(sp_part_item, sp_part.Comment if sp_part.Comment is not None else "", column=4)
+                self.items.append(sp_part)
+        self.tree.ExpandAll()
+
+    def start(self, o: object):
+        if not is_entity(o) or o.sp_own_type is None:
+            logging.warning("Unsupported object for supplied data: %s" % type(o))
         self.o = o
-        self._type = _type
-        self._main_sizer.Detach(2)
-        self._deputy.Hide()
-        self._main_sizer.Add(self.list, 1, wx.EXPAND)
-        self.list.Show()
-        self._render()
-        self.statusbar.SetStatusText(o.get_tree_name())
-        self.toolbar.EnableTool(wx.ID_ADD, True)
-        self.Layout()
+        self.sz.Detach(1)
+        self.sz.Add(self.tree, 1, wx.EXPAND)
+        self.deputy.Hide()
+        self.tree.Show()
+        self.load()
+        self.update_controls_state()
+        self.disable_overlay.Hide()
 
     def end(self):
         self.o = None
-        self._type = None
-        self.list.DeleteAllItems()
-        self._main_sizer.Detach(2)
-        self.list.Hide()
-        self._main_sizer.Add(self._deputy, 1, wx.CENTER)
-        self._deputy.Show()
-        self.statusbar.SetStatusText("")
-        self.Layout()
+        self.sz.Detach(1)
+        self.sz.Add(self.deputy, 1, wx.EXPAND)
+        self.tree.Hide()
+        self.deputy.Show()
+        self.tree.DeleteAllItems()
+        self.update_controls_state()
+        self.disable_overlay.Show()
+
+    def update_controls_state(self):
+        valid_item = (
+            len(self.tree.GetSelections()) == 1 and self.tree.GetSelections().__getitem__(0) != self.tree.GetRootItem()
+        )
+        if len(self.tree.GetSelections()) == 1:
+            entity = self.tree.GetItemPyData(self.tree.GetSelections().__getitem__(0))
+        else:
+            entity = None
+        self.tb.EnableTool(wx.ID_FILE1, self.o is not None and entity is None)
+        self.tb.EnableTool(wx.ID_FILE2, self.o is not None and valid_item and isinstance(entity, SuppliedData))
+        self.tb.EnableTool(wx.ID_EDIT, self.o is not None and valid_item)
+        self.tb.EnableTool(wx.ID_DELETE, self.o is not None and len(self.tree.GetSelections()) > 0)
+        self.tb.EnableTool(wx.ID_DOWN, self.o is not None and len(self.tree.GetSelections()) > 0)

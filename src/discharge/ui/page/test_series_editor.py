@@ -3,13 +3,13 @@ from dataclasses import dataclass, field
 from typing import Dict, Iterable
 
 import wx
-from pony.orm import commit, count, db_session, select
+from pony.orm import commit, db_session, select
 from wx.grid import GridCellAutoWrapStringEditor, GridCellEditor, GridCellRenderer, GridCellStringRenderer
 
 from src.bore_hole.ui.choice import Choice as BoreHoleChoice
 from src.ctx import app_ctx
-from src.database import BoreHole, DischargeMeasurement, DischargeSeries, FoundationDocument, OrigSampleSet
-from src.datetimeutil import decode_date, encode_date
+from src.database import DischargeMeasurement, OrigSampleSet
+from src.datetimeutil import decode_date
 from src.document.ui.choice import Choice as FoundationChoice
 from src.ui.grid import (
     EVT_GRID_EDITOR_STATE_CHANGED,
@@ -149,7 +149,7 @@ class DMModel(Model):
     def _get_column_width(self, name):
         if self._config_provider is not None:
             column_width = self._config_provider["column_width"]
-            if column_width != None and name in column_width:
+            if column_width is not None and name in column_width:
                 return column_width[name]
         return -1
 

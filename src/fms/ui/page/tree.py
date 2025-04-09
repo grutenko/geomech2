@@ -4,7 +4,13 @@ from pony.orm import db_session, select
 from src.ctx import app_ctx
 from src.database import PMSampleSet, PMTestSeries
 from src.ui.icon import get_icon
-from src.ui.tree import EVT_WIDGET_TREE_ACTIVATED, TreeNode, TreeWidget
+from src.ui.tree import (
+    EVT_WIDGET_TREE_ACTIVATED,
+    EVT_WIDGET_TREE_MENU,
+    EVT_WIDGET_TREE_SEL_CHANGED,
+    TreeNode,
+    TreeWidget,
+)
 
 
 class _PmSampleSet_Node(TreeNode):
@@ -104,6 +110,28 @@ class TreePage(wx.Panel):
         self.SetSizer(sz)
         self.Layout()
         self.tree.Bind(EVT_WIDGET_TREE_ACTIVATED, self.on_activate)
+        self.tree.Bind(EVT_WIDGET_TREE_MENU, self.on_menu)
+        self.tree.Bind(EVT_WIDGET_TREE_SEL_CHANGED, self.on_sel_changed)
+
+    def on_sel_changed(self, event):
+        self.update_controls_state()
+
+    def on_menu(self, event):
+        m = wx.Menu()
+        if isinstance(event.node, _PmTestSeries_Node):
+            i = m.Append(wx.ID_NEW, "Добавить пробу")
+            i.SetBitmap(get_icon("file-add"))
+            m.AppendSeparator()
+            i = m.Append(wx.ID_EDIT, "Изменить")
+            i.SetBitmap(get_icon("edit"))
+            i = m.Append(wx.ID_DELETE, "Удалить")
+            i.SetBitmap(get_icon("delete"))
+        elif isinstance(event.node, _PmSampleSet_Node):
+            i = m.Append(wx.ID_EDIT, "Изменить")
+            i.SetBitmap(get_icon("edit"))
+            i = m.Append(wx.ID_DELETE, "Удалить")
+            i.SetBitmap(get_icon("delete"))
+        self.PopupMenu(m, event.point)
 
     def on_activate(self, event):
         if isinstance(event.node, _PmSampleSet_Node):
@@ -113,6 +141,10 @@ class TreePage(wx.Panel):
 
     def get_name(self):
         return "ФМС"
+
+    def update_controls_state(self):
+        self.toolbar.EnableTool(wx.ID_EDIT, self.tree.get_current_node() is not None)
+        self.toolbar.EnableTool(wx.ID_DELETE, self.tree.get_current_node() is not None)
 
     def get_icon(self):
         return get_icon("folder")

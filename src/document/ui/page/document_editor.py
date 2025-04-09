@@ -59,7 +59,7 @@ class DocumentEditor(wx.Panel):
         self.SetSizer(sz)
         self.Layout()
         if not self.is_new:
-            self.supplied_data.start(self.o, _type="FOUNDATION_DOC")
+            self.supplied_data.start(self.o)
             self.set_fields()
         self.toolbar.Bind(wx.EVT_TOOL, self.save, id=wx.ID_SAVE)
 

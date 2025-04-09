@@ -6,18 +6,18 @@ import wx.aui
 from pony.orm import db_session
 
 import src.bore_hole.ui.page.bore_hole_editor
-import src.bore_hole.ui.page.list
-import src.console.ui.page.script_editor
 import src.discharge.ui.page.list
 import src.discharge.ui.page.test_series_editor
 import src.fms.ui.page.sample_set_editor
 import src.fms.ui.page.test_series_editor
 import src.fms.ui.page.tree
+import src.map.ui.page.map
 import src.mine_object.ui.page.mine_object_editor
 import src.objects.ui.page.tree
+import src.orig_sample_set.ui.page.disperse_editor
+import src.orig_sample_set.ui.page.stuf_editor
 import src.rock_burst.ui.page.editor
 import src.rock_burst.ui.page.list
-import src.station.ui.page.list
 import src.station.ui.page.station_editor
 from src.config import flush
 from src.ctx import app_ctx
@@ -35,6 +35,7 @@ from .actions import (
     ID_OPEN_DISCHARGE,
     ID_OPEN_DOCUMENTS,
     ID_OPEN_FMS_TREE,
+    ID_OPEN_MAP,
     ID_OPEN_ROCK_BURST_TREE,
     ID_OPEN_TREE,
 )
@@ -135,12 +136,23 @@ class MainWindow(wx.Frame):
         def documents_editor_def(o=None, is_new=False, parent_object=None):
             return DocumentEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
+        def stuf_editor_def(o=None, is_new=False, parent_object=None):
+            return src.orig_sample_set.ui.page.stuf_editor.StufEditor(
+                self.notebook, is_new=is_new, o=o, parent_object=parent_object
+            )
+
+        def disperse_editor_def(o=None, is_new=False, parent_object=None):
+            return src.orig_sample_set.ui.page.disperse_editor.DisperseEditor(
+                self.notebook, is_new=is_new, o=o, parent_object=parent_object
+            )
+
         self.page_def = {
             "tree": lambda **kwds: src.objects.ui.page.tree.PageTree(self.notebook),
             "fms_tree": lambda **kwds: src.fms.ui.page.tree.TreePage(self.notebook),
             "rock_burst_list": lambda **kwds: src.rock_burst.ui.page.list.RockBurstWidget(self.notebook),
             "discharge_list": lambda **kwds: src.discharge.ui.page.list.DischargeList(self.notebook),
-            "console_editor": lambda **kwds: src.console.ui.page.script_editor.ScriptEditor(self.notebook),
+            # "console_editor": lambda **kwds: src.console.ui.page.script_editor.ScriptEditor(self.notebook),
+            "map": lambda **kwds: src.map.ui.page.map.Map(self.notebook),
             "pm_sample_set_editor": pm_sample_set_editor_def,
             "pm_test_series_editor": pm_test_series_editor_def,
             "rock_burst_editor": rock_burst_editor_def,
@@ -150,6 +162,8 @@ class MainWindow(wx.Frame):
             "test_series_editor": test_series_editor_def,
             "documents_list": lambda **kwds: Documents(self.notebook),
             "document_editor": documents_editor_def,
+            "stuf_editor": stuf_editor_def,
+            "disperse_editor": disperse_editor_def,
         }
 
         # Функции должны возвращать true если наборы аргументов соответствуют друг другу,
@@ -165,6 +179,7 @@ class MainWindow(wx.Frame):
 
         self.page_cmp_args = {
             "tree": lambda args0, args1: True,
+            "map": lambda args0, args1: True,
             "fms_tree": lambda args0, args1: True,
             "discharge_list": lambda args0, args1: True,
             "console_editor": lambda args0, args1: True,
@@ -178,6 +193,8 @@ class MainWindow(wx.Frame):
             "pm_test_series_editor": base_args_cmp,
             "documents_list": lambda args0, args1: True,
             "document_editor": base_args_cmp,
+            "stuf_editor": base_args_cmp,
+            "disperse_editor": base_args_cmp,
         }
         self.pages = []
 
@@ -209,10 +226,18 @@ class MainWindow(wx.Frame):
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_discharge_list, id=ID_OPEN_DISCHARGE)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_documents, id=ID_OPEN_DOCUMENTS)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_console, id=ID_OPEN_CONSOLE)
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_open_map, id=ID_OPEN_MAP)
         self.menu.Bind(wx.EVT_MENU, self.on_close_tab, id=wx.ID_CLOSE)
         self.menu.Bind(wx.EVT_MENU, self.on_next_tab, id=wx.ID_PREVIEW_NEXT)
         self.menu.Bind(wx.EVT_MENU, self.on_prev_tab, id=wx.ID_PREVIEW_PREVIOUS)
         self.menu.Bind(wx.EVT_MENU, self.on_open_settings, id=wx.ID_PROPERTIES)
+
+    def on_open_map(self, event):
+        _ctx = self.find_ctx_by_code("map")
+        if _ctx is None:
+            self.open("map")
+        else:
+            self.close(_ctx.o)
 
     def on_open_console(self, event):
         _ctx = self.find_ctx_by_code("console_editor")
@@ -385,6 +410,7 @@ class MainWindow(wx.Frame):
         self.toolbar.ToggleTool(ID_OPEN_DISCHARGE, self.find_ctx_by_code("discharge_list") is not None)
         self.toolbar.ToggleTool(ID_OPEN_DOCUMENTS, self.find_ctx_by_code("documents_list") is not None)
         self.toolbar.ToggleTool(ID_OPEN_CONSOLE, self.find_ctx_by_code("console_editor") is not None)
+        self.toolbar.ToggleTool(ID_OPEN_MAP, self.find_ctx_by_code("map") is not None)
         self.menu.Enable(wx.ID_CLOSE, self.notebook.GetPageCount() > 0)
         self.menu.Enable(
             wx.ID_PREVIEW_NEXT,

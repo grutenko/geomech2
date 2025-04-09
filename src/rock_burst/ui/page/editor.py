@@ -3,8 +3,12 @@ import wx.propgrid
 from pony.orm import db_session, desc, select
 from pubsub.pub import subscribe, unsubscribe
 
-from src.database import MineObject, RBCause, RBSign, RBType, RBTypicalCause, RBTypicalSign
+from src.ctx import app_ctx
+from src.database import MineObject, RBCause, RBSign, RBType, RBTypicalCause, RBTypicalSign, RockBurst
+from src.datetimeutil import decode_datetime, encode_datetime
+from src.mine_object.ui.choice import Choice as MineObjectChoice
 from src.ui.icon import get_icon
+from src.ui.page import PageHdrChangedEvent
 from src.ui.supplied_data import SuppliedDataWidget
 from src.ui.validators import DateValidator, TextValidator
 
@@ -75,7 +79,9 @@ class RockBurstEditor(wx.Panel):
 
         self.page_main = wx.Panel(self.notebook)
         sizer = wx.BoxSizer(wx.VERTICAL)
-        self.page_main_propgrid = wx.propgrid.PropertyGrid(self.page_main, style=wx.propgrid.PG_DEFAULT_STYLE | wx.propgrid.PG_SPLITTER_AUTO_CENTER)
+        self.page_main_propgrid = wx.propgrid.PropertyGrid(
+            self.page_main, style=wx.propgrid.PG_DEFAULT_STYLE | wx.propgrid.PG_SPLITTER_AUTO_CENTER
+        )
         pg = self.page_main_propgrid
         pg.Append(wx.propgrid.FloatProperty("Глубина поверхност. (м)", "BurstDepth"))
         pg.Append(wx.propgrid.LongStringProperty("Описание места", "Place"))

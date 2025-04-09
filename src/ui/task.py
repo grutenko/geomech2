@@ -66,8 +66,8 @@ class Task(wx.ProgressDialog):
     def on_alarm(self, event):
         with self.job.lock:
             if self.status == "alive":
-                if self.job.message != None:
-                    self.Update(self.GetValue(), self.job.message)
+                if self.job.message is not None:
+                    self.Update(self.gauge.GetValue(), self.job.message)
                 if self.job.progress == -1:
                     self.Pulse()
                 else:
