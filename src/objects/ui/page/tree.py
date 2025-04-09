@@ -3,7 +3,7 @@ from typing import List, Tuple
 import pubsub
 import pubsub.pub
 import wx
-from pony.orm import db_session, desc, select
+from pony.orm import commit, db_session, desc, select
 
 from src.ctx import app_ctx
 from src.database import (
@@ -17,7 +17,6 @@ from src.database import (
     Station,
 )
 from src.delete_object import delete_object
-from src.identity import Identity
 from src.ui.icon import get_art, get_icon
 from src.ui.tree import EVT_WIDGET_TREE_ACTIVATED, EVT_WIDGET_TREE_MENU, TreeNode, TreeWidget
 
@@ -904,7 +903,30 @@ class _TreeWidget(TreeWidget):
         self._create_object(self._current_object, OrigSampleSet)
 
     def _on_delete_bore_hole(self, event):
-        self._delete_object(self._current_node)
+        o = self._current_object
+        dlg = wx.MessageDialog(
+            None,
+            "Вы действительно хотите удалить объект: %s?\nЭто действие необратимо." % o.Name,
+            "Подтвердите удаление",
+            wx.YES | wx.NO | wx.NO_DEFAULT | wx.ICON_ASTERISK,
+        )
+        if dlg.ShowModal() != wx.ID_YES:
+            return
+        bore_hole = BoreHole[o.RID]
+        orig_sample_set = select(oo for oo in OrigSampleSet if oo.bore_hole == o).first()
+        if orig_sample_set is not None:
+            if len(orig_sample_set.discharge_series) > 0 or len(orig_sample_set.pm_samples) > 0:
+                wx.MessageBox(
+                    "Запрещено удалять объекты к которым есть связаные данные.",
+                    "Удаление запрещено",
+                    wx.OK | wx.CENTRE | wx.ICON_ERROR,
+                )
+                return
+            orig_sample_set.delete()
+        bore_hole.delete()
+        commit()
+        pubsub.pub.sendMessage("object.deleted", o=bore_hole)
+        self.soft_reload_childrens(self._current_node.get_parent())
 
     def _on_delete_discharge_series(self, event):
         o = self._current_object
@@ -912,15 +934,12 @@ class _TreeWidget(TreeWidget):
         pubsub.pub.sendMessage("cmd.dm.delete", target=self, core=o)
 
     def _on_create_discharge_series(self, event):
-        o = self._current_object
+        ...
         # Посылаем команду открытия окна создания серии замеров
-        pubsub.pub.sendMessage("cmd.dm.create", target=self, core=o)
-        pubsub.pub.sendMessage("cmd.dm.open", target=self, identity=Identity(o, o, None))
 
     def _on_select_dm(self, event):
-        o = self._current_object
+        ...
         # Посылаем запрос на открытие вкладки таблицы замеров для этого керна
-        pubsub.pub.sendMessage("cmd.dm.open", target=self, identity=Identity(o, o, None))
 
     def _on_open_supplied_data(self, event):
         pubsub.pub.sendMessage("cmd.supplied_data.show", target=self)
