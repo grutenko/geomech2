@@ -19,7 +19,6 @@ class BuildExecutable(build_py):
             "--clean",
             "--splash=icons/logo.png",
             "--add-data=icons:icons",
-            "--add-data=fonts:fonts",
             "--name=geomech",
             "--hidden-import=jedi",
             "--hidden-import=wx._xml",
