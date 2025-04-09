@@ -1,1 +1,1 @@
-from .window import MainWindow
+from .window import MainWindow  # noqa: F401
