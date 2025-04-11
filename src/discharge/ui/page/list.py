@@ -8,7 +8,6 @@ from src.ctx import app_ctx
 from src.database import DischargeSeries, OrigSampleSet
 from src.datetimeutil import decode_date
 from src.delete_object import delete_object
-from src.identity import Identity
 from src.ui.icon import get_icon
 
 
@@ -116,7 +115,11 @@ class DischargeList(wx.Panel, listmix.ColumnSorterMixin):
             if delete_object(ds):
                 self._load()
         else:
-            wx.MessageBox("Запрещено удалять объекты к которым есть связаные данные.", "Удаление запрещено", wx.OK | wx.CENTRE | wx.ICON_ERROR)
+            wx.MessageBox(
+                "Запрещено удалять объекты к которым есть связаные данные.",
+                "Удаление запрещено",
+                wx.OK | wx.CENTRE | wx.ICON_ERROR,
+            )
 
     def _on_edit(self, event):
         if self._list.GetFirstSelected() == -1:
@@ -128,9 +131,7 @@ class DischargeList(wx.Panel, listmix.ColumnSorterMixin):
     def _on_select_core(self, event):
         if self._list.GetFirstSelected() == -1:
             return None
-        ds = self._items[self._list.GetItemData(self._list.GetFirstSelected())]
-        core = OrigSampleSet[ds.orig_sample_set.RID]
-        pubsub.pub.sendMessage("cmd.object.select", target=self, identity=Identity(core, core, None))
+        # ds = self._items[self._list.GetItemData(self._list.GetFirstSelected())]
 
     @db_session
     def _load(self):

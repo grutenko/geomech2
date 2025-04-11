@@ -32,6 +32,8 @@ class SuppliedDataWidget(wx.Panel):
     def __init__(self, parent, deputy_text=None):
         self.o = None
         self.items = []
+        self.o = None
+        self.items = []
         super().__init__(parent)
         self.start_pos = None
         self.end_pos = None
@@ -62,7 +64,40 @@ class SuppliedDataWidget(wx.Panel):
         self.tree.AddColumn("Комментарий", width=300)
         self.tree.AssignImageList(self.image_list)
         self.tree.Hide()
+        self.start_pos = None
+        self.end_pos = None
+        self.overlay = wx.Overlay()
+        self.is_selecting = False
+        self.sz = wx.BoxSizer(wx.VERTICAL)
+        self.tb = wx.ToolBar(self, style=wx.TB_FLAT)
+        self.tb.AddTool(wx.ID_DOWN, "Скачать", get_icon("download"), shortHelp="Скачать")
+        self.tb.AddTool(wx.ID_FILE1, "Добавить папку", get_icon("folder-add"), shortHelp="Добавить папку")
+        self.tb.AddTool(
+            wx.ID_FILE2, "Добавить файл", get_icon("file-add"), kind=wx.ITEM_DROPDOWN, shortHelp="Добавить файл"
+        )
+        self.tb.AddSeparator()
+        self.tb.AddTool(wx.ID_EDIT, "Изменить", get_icon("edit"), shortHelp="Изменить")
+        self.tb.AddTool(wx.ID_DELETE, "Удалить", get_icon("delete"), shortHelp="Удалить")
+        self.tb.Realize()
+        self.sz.Add(self.tb, 0, wx.EXPAND)
+        self.image_list = wx.ImageList(16, 16)
+        self.icon_book = self.image_list.Add(get_icon("book"))
+        self.icon_folder = self.image_list.Add(get_icon("folder"))
+        self.icon_folder_open = self.image_list.Add(get_icon("folder-open"))
+        self.icon_file = self.image_list.Add(get_icon("file"))
+        self.tree = TreeListCtrl(self, agwStyle=wx.TR_DEFAULT_STYLE | wx.TR_MULTIPLE)
+        self.tree.AddColumn("Название", width=450)
+        self.tree.AddColumn("Тип", width=100)
+        self.tree.AddColumn("Размер", width=80)
+        self.tree.AddColumn("Датировка", width=150)
+        self.tree.AddColumn("Комментарий", width=300)
+        self.tree.AssignImageList(self.image_list)
+        self.tree.Hide()
         if deputy_text is None:
+            deputy_text = "Недоступно"
+        self.deputy = wx.StaticText(self, label=deputy_text)
+        self.sz.Add(self.deputy, 1, wx.CENTER | wx.ALL, border=100)
+        self.SetSizer(self.sz)
             deputy_text = "Недоступно"
         self.deputy = wx.StaticText(self, label=deputy_text)
         self.sz.Add(self.deputy, 1, wx.CENTER | wx.ALL, border=100)
@@ -247,7 +282,35 @@ class SuppliedDataWidget(wx.Panel):
         self.file_add_task.Destroy()
         self.load()
         self.update_controls_state()
+            self.file_add_task = Task(
+                "идет добавление файлов...",
+                "Добавление файлов",
+                AddFileTask([dlg.fields]),
+                can_abort=False,
+                show_time=False,
+            )
+            try:
+                self.file_add_task.then(self.on_file_add_resolve, self.on_file_add_reject)
+                self.file_add_task.run()
+            except Exception as e:
+                self.file_add_task.Destroy()
+                raise e
 
+    def on_file_add_resolve(self, data):
+        self.file_add_task.Destroy()
+        self.load()
+        self.update_controls_state()
+
+    def on_file_add_reject(self, e):
+        self.file_add_task.Destroy()
+        raise e
+
+    def on_edit(self, event):
+        data = self.tree.GetItemPyData(self.tree.GetSelections().__getitem__(0))
+        if isinstance(data, SuppliedData):
+            dlg = FolderDialog(self, own_entity=self.o, is_new=False, o=data)
+        elif isinstance(data, SuppliedDataPart):
+            dlg = FileDialog(self, is_new=False, o=data)
     def on_file_add_reject(self, e):
         self.file_add_task.Destroy()
         raise e
@@ -261,7 +324,19 @@ class SuppliedDataWidget(wx.Panel):
         if dlg.ShowModal() == wx.ID_OK:
             self.load()
             self.update_controls_state()
+            self.load()
+            self.update_controls_state()
 
+    @db_session
+    def on_delete(self, event):
+        if (
+            wx.MessageBox(
+                "Вы действительно хотите удалить сопутствующие материалы?",
+                "Подтвердите удаление",
+                style=wx.YES | wx.NO | wx.CANCEL | wx.NO_DEFAULT | wx.ICON_INFORMATION,
+            )
+            != wx.YES
+        ):
     @db_session
     def on_delete(self, event):
         if (
@@ -281,7 +356,37 @@ class SuppliedDataWidget(wx.Panel):
                 entities.add(sp)
                 for o in sp.parts:
                     entities.add(o)
+        entities = set()
+        for item in self.tree.GetSelections():
+            data = self.tree.GetItemPyData(item)
+            if isinstance(data, SuppliedData):
+                sp = SuppliedData[data.RID]
+                entities.add(sp)
+                for o in sp.parts:
+                    entities.add(o)
             else:
+                entities.add(SuppliedDataPart[data.RID])
+
+        self.delete_task = Task(
+            "Удаление", "идет удаление сопутствующих материалов...", DeleteTask(entities), self, can_abort=True
+        )
+        try:
+            self.delete_task.then(self.on_delete_resolve, self.on_delete_reject)
+            self.delete_task.run()
+        except Exception as e:
+            self.delete_task.Destroy()
+            raise e
+
+    def on_delete_resolve(self, data):
+        self.delete_task.Destroy()
+        self.load()
+        self.update_controls_state()
+
+    def on_delete_reject(self, e):
+        self.delete_task.Destroy()
+
+    def on_select(self, event):
+        self.update_controls_state()
                 entities.add(SuppliedDataPart[data.RID])
 
         self.delete_task = Task(
