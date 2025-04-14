@@ -1,3 +1,5 @@
+import re
+
 import wx
 from pony.orm import db_session, select
 
@@ -52,7 +54,11 @@ class _PmTestSeries_Node(TreeNode):
     @db_session(optimistic=False)
     def get_subnodes(self):
         nodes = []
-        for o in select(o for o in PMSampleSet if o.pm_test_series == self.o):
+        samples_sets = select(o for o in PMSampleSet if o.pm_test_series == self.o)[:]
+        samples_sets = sorted(
+            samples_sets, key=lambda p: (float(p.Number) if re.match(r"^\d+(\.\d+)?$", p.Number) else float("inf"))
+        )
+        for o in samples_sets:
             nodes.append(_PmSampleSet_Node(o))
         return nodes
 
@@ -154,6 +160,3 @@ class TreePage(wx.Panel):
     def on_edit(self, event): ...
 
     def on_delete(self, event): ...
-
-    def serialize(self):
-        return {}

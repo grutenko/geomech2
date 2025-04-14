@@ -138,6 +138,9 @@ class BoreHole(db.Entity):
     EndDate = Optional(int, column="EndDate", size=64)
     DestroyDate = Optional(int, column="DestroyDate", size=64)
 
+    def get_number(self):
+        return self.Number.split("@").__getitem__(0)
+
     def get_tree_name(self):
         return "[Скважина] %s" % self.Name
 

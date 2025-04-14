@@ -138,6 +138,7 @@ class _BoreHole_Node(TreeNode):
 
     def get_icon(self) -> Tuple[str, wx.Bitmap] | None:
         return "file", get_icon("file", 16)
+        return "file", get_icon("file", 16)
 
     def is_leaf(self):
         return True
@@ -787,6 +788,7 @@ class _TreeWidget(TreeWidget):
             return
         sel = self.get_current_node()
         self.set_root_node(node)
+        if sel is not None:
         if sel is not None:
             self.select_node(sel)
         self._mode = mode

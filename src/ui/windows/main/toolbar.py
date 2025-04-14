@@ -2,14 +2,7 @@ import wx
 
 from src.ui.icon import get_icon
 
-from .actions import (
-    ID_OPEN_DISCHARGE,
-    ID_OPEN_DOCUMENTS,
-    ID_OPEN_FMS_TREE,
-    ID_OPEN_MAP,
-    ID_OPEN_ROCK_BURST_TREE,
-    ID_OPEN_TREE,
-)
+from .actions import ID_OPEN_DISCHARGE, ID_OPEN_DOCUMENTS, ID_OPEN_FMS, ID_OPEN_ROCK_BURST_TREE, ID_OPEN_TREE
 
 
 class MainToolbar(wx.ToolBar):
@@ -20,7 +13,7 @@ class MainToolbar(wx.ToolBar):
         m.Append(1, "Скважины")
         m.Append(2, "Станции")
         self.SetDropdownMenu(ID_OPEN_TREE, m)
-        self.AddCheckTool(ID_OPEN_FMS_TREE, "ФМС", get_icon("folder"))
+        self.AddCheckTool(ID_OPEN_FMS, "ФМС", get_icon("folder"))
         self.AddCheckTool(ID_OPEN_ROCK_BURST_TREE, "Горные удары", get_icon("folder"))
         self.AddCheckTool(ID_OPEN_DISCHARGE, "Разгрузка", get_icon("folder"))
         self.AddCheckTool(ID_OPEN_DOCUMENTS, "Документы", get_icon("folder"))

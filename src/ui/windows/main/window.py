@@ -8,6 +8,7 @@ from pony.orm import db_session
 import src.bore_hole.ui.page.bore_hole_editor
 import src.discharge.ui.page.list
 import src.discharge.ui.page.test_series_editor
+import src.fms.ui.page.fms
 import src.fms.ui.page.sample_set_editor
 import src.fms.ui.page.test_series_editor
 import src.fms.ui.page.tree
@@ -70,7 +71,7 @@ class PageCtx:
 class MainWindow(wx.Frame):
     @db_session
     def __init__(self):
-        super().__init__(None, title="База данных геомеханики", size=wx.Size(600, 580))
+        super().__init__(None, title="База данных геомеханики", size=wx.Size(900, 580))
         self.CenterOnScreen()
         self.SetIcon(wx.Icon(get_icon("logo")))
 
@@ -148,7 +149,7 @@ class MainWindow(wx.Frame):
 
         self.page_def = {
             "tree": lambda **kwds: src.objects.ui.page.tree.PageTree(self.notebook),
-            "fms_tree": lambda **kwds: src.fms.ui.page.tree.TreePage(self.notebook),
+            "fms": lambda **kwds: src.fms.ui.page.fms.FmsPage(self.notebook),
             "rock_burst_list": lambda **kwds: src.rock_burst.ui.page.list.RockBurstWidget(self.notebook),
             "discharge_list": lambda **kwds: src.discharge.ui.page.list.DischargeList(self.notebook),
             # "console_editor": lambda **kwds: src.console.ui.page.script_editor.ScriptEditor(self.notebook),
@@ -221,7 +222,7 @@ class MainWindow(wx.Frame):
         self.Bind(EVT_PAGE_HDR_CHANGED, self.on_page_header_changed)
         self.Bind(wx.EVT_MENU, self.on_change_credentials, id=ID_CHANGE_CREDENTIALS)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_toggle_tree, id=ID_OPEN_TREE)
-        self.toolbar.Bind(wx.EVT_TOOL, self.on_toggle_fms_tree, id=ID_OPEN_FMS_TREE)
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_toggle_fms, id=ID_OPEN_FMS)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_rock_bursts, id=ID_OPEN_ROCK_BURST_TREE)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_discharge_list, id=ID_OPEN_DISCHARGE)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_documents, id=ID_OPEN_DOCUMENTS)
@@ -263,10 +264,10 @@ class MainWindow(wx.Frame):
         else:
             self.close(_ctx.o)
 
-    def on_toggle_fms_tree(self, event):
-        _ctx = self.find_ctx_by_code("fms_tree")
+    def on_toggle_fms(self, event):
+        _ctx = self.find_ctx_by_code("fms")
         if _ctx is None:
-            self.open("fms_tree")
+            self.open("fms")
         else:
             self.close(_ctx.o)
 
@@ -405,7 +406,7 @@ class MainWindow(wx.Frame):
 
     def update_controls_state(self):
         self.toolbar.ToggleTool(ID_OPEN_TREE, self.find_ctx_by_code("tree") is not None)
-        self.toolbar.ToggleTool(ID_OPEN_FMS_TREE, self.find_ctx_by_code("fms_tree") is not None)
+        self.toolbar.ToggleTool(ID_OPEN_FMS, self.find_ctx_by_code("fms") is not None)
         self.toolbar.ToggleTool(ID_OPEN_ROCK_BURST_TREE, self.find_ctx_by_code("rock_burst_list") is not None)
         self.toolbar.ToggleTool(ID_OPEN_DISCHARGE, self.find_ctx_by_code("discharge_list") is not None)
         self.toolbar.ToggleTool(ID_OPEN_DOCUMENTS, self.find_ctx_by_code("documents_list") is not None)
