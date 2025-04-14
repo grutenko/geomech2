@@ -481,6 +481,7 @@ class FmsTable(wx.Panel):
         self.model.set_filter(self.filter)
         self.model.load()
         self.table._render()
+        self.table.auto_size_columns()
 
     def on_toggle_extended_mode(self, event=None):
         if self.toolbar.GetToolState(wx.ID_PREVIEW):
@@ -492,6 +493,7 @@ class FmsTable(wx.Panel):
     def on_refresh(self, event):
         self.model.load()
         self.table._render()
+        self.table.auto_size_columns()
 
     def start(self):
         if not self.started:
@@ -503,6 +505,7 @@ class FmsTable(wx.Panel):
             self.table._render()
             self.started = True
             self.table.apply_controls()
+            self.table.auto_size_columns()
 
     def end(self):
         self.table.remove_controls()

@@ -8,10 +8,16 @@ from src.ui.validators import TextValidator
 
 
 class LoginDialog(wx.Dialog):
-    def __init__(self, parent=None, mode="LOGIN"):
+    def __init__(self, parent=None, mode="LOGIN", without_config=False):
         super().__init__(None, title="База данных геомеханики")
         self.SetIcon(wx.Icon(get_icon("logo")))
         self.SetSize(270, 230)
+        self.login = None
+        self.password = None
+        self.database = None
+        self.host = None
+        self.port = None
+        self.without_config = without_config
         sz = wx.BoxSizer(wx.VERTICAL)
         main_sz = wx.BoxSizer(wx.VERTICAL)
         label = wx.StaticText(self, label="логин:")
@@ -57,9 +63,18 @@ class LoginDialog(wx.Dialog):
         self.SetSizer(sz)
         self.Layout()
         self.CenterOnScreen()
-
-        self.paste_credentials_from_config()
+        if not self.without_config:
+            self.paste_credentials_from_config()
+        else:
+            self.paste_credentials_default()
         self.btn_login.Bind(wx.EVT_BUTTON, self.on_login)
+
+    def paste_credentials_default(self):
+        self.field_login.SetValue("postgres")
+        self.field_password.SetValue("postgres")
+        self.field_database.SetValue("geomech")
+        self.field_host.SetValue("127.0.0.1")
+        self.field_port.SetValue(5432)
 
     def paste_credentials_from_config(self):
         cfg = app_ctx().config
@@ -94,11 +109,18 @@ class LoginDialog(wx.Dialog):
         except Exception as e:
             wx.MessageBox(str(e), "Ошибка подключения к базе данных", style=wx.OK | wx.ICON_ERROR)
         else:
-            cfg = app_ctx().config
-            cfg.login = login
-            cfg.password = password
-            cfg.database = database
-            cfg.host = host
-            cfg.port = port
-            flush(cfg, app_ctx().config_filename)
+            if not self.without_config:
+                cfg = app_ctx().config
+                cfg.login = login
+                cfg.password = password
+                cfg.database = database
+                cfg.host = host
+                cfg.port = port
+                flush(cfg, app_ctx().config_filename)
+            else:
+                self.login = login
+                self.password = password
+                self.database = database
+                self.host = host
+                self.port = port
             self.EndModal(wx.ID_OK)

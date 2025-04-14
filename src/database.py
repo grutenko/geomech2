@@ -559,6 +559,7 @@ class PMSampleSet(db.Entity):
 class PMSample(db.Entity):
     _table_ = "PMSamples"
 
+    pm_task_methods_for_samples = Set("PmTaskMethodForSample")
     pm_sample_set = Required(PMSampleSet, column="SSID")
     orig_sample_set = Required(OrigSampleSet, column="OSSID")
     pm_sample_property_values = Set("PmSamplePropertyValue")
@@ -589,6 +590,7 @@ class PMSample(db.Entity):
 class PmTestMethod(db.Entity):
     _table_ = "PMTestMethods"
 
+    pm_task_methods_for_samples = Set("PmTaskMethodForSample")
     pm_sample_property_values = Set("PmSamplePropertyValue")
     pm_used_properties = Set("PmSampleSetUsedProperties")
 
@@ -670,6 +672,8 @@ class PmSamplePropertyValue(db.Entity):
 class PmPerformedTask(db.Entity):
     _table_ = "PMPerformedTasks"
 
+    pm_task_methods_for_samples = Set("PmTaskMethodForSample")
+
     RID = PrimaryKey(int, auto=True, column="RID")
     Name = Required(str, column="Name")
     Comment = Optional(str, column="Comment")
@@ -692,6 +696,20 @@ class PmSampleSetUsedProperties(db.Entity):
     @property
     def Name(self):
         return self.pm_property.Name
+
+    @property
+    def sp_own_type(self):
+        return None
+
+
+class PmTaskMethodForSample(db.Entity):
+    _table_ = "PMTasksMethodsForSamples"
+
+    pm_sample = Required(PMSample, column="RSID")
+    pm_method = Required(PmTestMethod, column="TMID")
+    pm_performed_task = Required(PmPerformedTask, column="PTID")
+
+    RID = PrimaryKey(int, auto=True, column="RID")
 
     @property
     def sp_own_type(self):
