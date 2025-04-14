@@ -15,7 +15,7 @@ class BuildExecutable(build_py):
             "PyInstaller",
             "--windowed",
             "--noconfirm",
-            "--onedir",
+            "--onefile",
             "--clean",
             "--splash=icons/logo.png",
             "--add-data=icons:icons",

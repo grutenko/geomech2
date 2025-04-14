@@ -72,6 +72,7 @@ class MainWindow(wx.Frame):
     @db_session
     def __init__(self):
         super().__init__(None, title="База данных геомеханики", size=wx.Size(900, 580))
+        self.SetSizeHints(580, 580, 2580, 2580)
         self.CenterOnScreen()
         self.SetIcon(wx.Icon(get_icon("logo")))
 

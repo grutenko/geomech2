@@ -39,6 +39,38 @@ class Filter:
 FilterChangedEvent, EVT_FILTER_CHANGED = wx.lib.newevent.NewEvent()
 
 
+class xCollapsiblePane(wx.Panel):
+    def __init__(self, parent, label):
+        super().__init__(parent)
+        sz = wx.BoxSizer(wx.VERTICAL)
+        self.label = label
+        self.btn = wx.ToggleButton(self, label=self.label + " ▼", style=wx.BORDER_NONE)
+        self.btn.SetBackgroundColour(parent.GetBackgroundColour())  # Чтобы не выделялась
+        self.btn.SetForegroundColour(wx.Colour(0, 0, 0))  # Например, синим
+        self.btn.SetFont(wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        self.btn.SetCursor(wx.Cursor(wx.CURSOR_HAND))  # Курсор как у ссылки
+        self.btn.Bind(wx.EVT_TOGGLEBUTTON, self.on_click)
+        sz.Add(self.btn, 0, wx.ALIGN_LEFT)
+        self.panel = wx.Panel(self)
+        sz.Add(self.panel, 1, wx.EXPAND)
+        self.panel.Hide()
+        self.SetSizer(sz)
+        self.Layout()
+
+    def on_click(self, event):
+        if self.btn.GetValue():
+            self.panel.Show()
+            self.btn.SetLabel(self.label + " ▲")
+        else:
+            self.panel.Hide()
+            self.btn.SetLabel(self.label + " ▼")
+        self.Layout()
+        self.GetParent().Layout()
+
+    def GetPane(self):
+        return self.panel
+
+
 class FilterPanel(wx.ScrolledWindow):
     def __init__(self, parent, filter):
         super().__init__(parent, style=wx.VSCROLL)
@@ -56,66 +88,84 @@ class FilterPanel(wx.ScrolledWindow):
         self.use_filter_checkbox = wx.CheckBox(self, label="Использовать фильтр")
         self.use_filter_checkbox.Bind(wx.EVT_CHECKBOX, self.on_use_filter)
         sz_in.Add(self.use_filter_checkbox, 0, wx.EXPAND | wx.BOTTOM, border=10)
-        label = wx.StaticText(self, label="Договоры")
-        sz_in.Add(label, 0, wx.EXPAND)
+
+        self.contracts_colpane = xCollapsiblePane(self, label="Договоры")
+        p = self.contracts_colpane.GetPane()
+        p_sz = wx.BoxSizer(wx.VERTICAL)
         btn_sz = wx.StdDialogButtonSizer()
-        self.test_series_select_all = wx.Button(self, label="Выбрать все")
+        self.test_series_select_all = wx.Button(p, label="Выбрать все")
         btn_sz.Add(self.test_series_select_all, 0)
-        self.test_series_remove_selection = wx.Button(self, label="Снять выделение")
+        self.test_series_remove_selection = wx.Button(p, label="Снять выделение")
         self.test_series_select_all.Bind(wx.EVT_BUTTON, self.on_test_series_select_all)
         self.test_series_remove_selection.Bind(wx.EVT_BUTTON, self.on_test_series_remove_selection)
         btn_sz.Add(self.test_series_remove_selection)
-        sz_in.Add(btn_sz, 0, wx.EXPAND)
-        self.test_series = wx.CheckListBox(self, size=wx.Size(-1, 100))
-        sz_in.Add(self.test_series, 0, wx.EXPAND | wx.BOTTOM, border=10)
-        label = wx.StaticText(self, label="Месторождения")
-        sz_in.Add(label, 0, wx.EXPAND)
+        p_sz.Add(btn_sz, 0, wx.EXPAND)
+        self.test_series = wx.CheckListBox(p, size=wx.Size(-1, 100))
+        p_sz.Add(self.test_series, 0, wx.EXPAND | wx.BOTTOM, border=10)
+        p.SetSizer(p_sz)
+        sz_in.Add(self.contracts_colpane, 0, wx.GROW)
+
+        self.fields_colpane = xCollapsiblePane(self, label="Месторождения")
+        p = self.fields_colpane.GetPane()
+        p_sz = wx.BoxSizer(wx.VERTICAL)
         btn_sz = wx.StdDialogButtonSizer()
-        self.field_select_all = wx.Button(self, label="Выбрать все")
+        self.field_select_all = wx.Button(p, label="Выбрать все")
         btn_sz.Add(self.field_select_all, 0)
-        self.field_remove_selection = wx.Button(self, label="Снять выделение")
+        self.field_remove_selection = wx.Button(p, label="Снять выделение")
         self.field_select_all.Bind(wx.EVT_BUTTON, self.on_field_select_all)
         self.field_remove_selection.Bind(wx.EVT_BUTTON, self.on_field_remove_selection)
         btn_sz.Add(self.field_remove_selection)
-        sz_in.Add(btn_sz, 0, wx.EXPAND)
-        self.fields = wx.CheckListBox(self, size=wx.Size(-1, 100))
-        sz_in.Add(self.fields, 0, wx.EXPAND | wx.BOTTOM, border=10)
-        label = wx.StaticText(self, label="Дата испытания")
-        sz_in.Add(label, 0, wx.EXPAND)
-        self.test_date_checkbox = wx.CheckBox(self, label="Ограничить по дате")
+        p_sz.Add(btn_sz, 0, wx.EXPAND)
+        self.fields = wx.CheckListBox(p, size=wx.Size(-1, 100))
+        p_sz.Add(self.fields, 0, wx.EXPAND | wx.BOTTOM, border=10)
+        p.SetSizer(p_sz)
+        sz_in.Add(self.fields_colpane, 0, wx.GROW)
+
+        self.date_colpane = xCollapsiblePane(self, label="Дата испытания")
+        p = self.date_colpane.GetPane()
+        p_sz = wx.BoxSizer(wx.VERTICAL)
+        self.test_date_checkbox = wx.CheckBox(p, label="Ограничить по дате")
         self.test_date_checkbox.Bind(wx.EVT_CHECKBOX, self.on_enable_date)
-        sz_in.Add(self.test_date_checkbox)
+        p_sz.Add(self.test_date_checkbox)
         h_sz = wx.BoxSizer(wx.HORIZONTAL)
-        self.field_test_date_from = wx.adv.DatePickerCtrl(self)
-        self.field_test_date_to = wx.adv.DatePickerCtrl(self, style=wx.adv.DP_ALLOWNONE)
+        self.field_test_date_from = wx.adv.DatePickerCtrl(p)
+        self.field_test_date_to = wx.adv.DatePickerCtrl(p, style=wx.adv.DP_ALLOWNONE)
         self.field_test_date_from.Disable()
         self.field_test_date_to.Disable()
         h_sz.Add(self.field_test_date_from, 1)
-        label = wx.StaticText(self, label="-")
+        label = wx.StaticText(p, label="-")
         h_sz.Add(label, 0, wx.ALIGN_CENTER_VERTICAL)
         h_sz.Add(self.field_test_date_to, 1)
-        sz_in.Add(h_sz, 0, wx.EXPAND)
-        self.checkbox_exclude_none_test_date = wx.CheckBox(self, label="Исключить пробы без даты испытания")
-        sz_in.Add(self.checkbox_exclude_none_test_date, 0, wx.EXPAND | wx.BOTTOM, border=10)
-        label = wx.StaticText(self, label="Петротип")
-        sz_in.Add(label, 0)
+        p_sz.Add(h_sz, 0, wx.EXPAND)
+        self.checkbox_exclude_none_test_date = wx.CheckBox(p, label="Исключить пробы без даты испытания")
+        p_sz.Add(self.checkbox_exclude_none_test_date, 0, wx.EXPAND | wx.BOTTOM, border=10)
+        p.SetSizer(p_sz)
+        sz_in.Add(self.date_colpane, 0, wx.GROW)
+
+        self.petrotype_colpane = xCollapsiblePane(self, label="Петротипы")
+        p = self.petrotype_colpane.GetPane()
+        p_sz = wx.BoxSizer(wx.VERTICAL)
         btn_sz = wx.StdDialogButtonSizer()
-        self.petrotype_select_all = wx.Button(self, label="Выбрать все")
+        self.petrotype_select_all = wx.Button(p, label="Выбрать все")
         btn_sz.Add(self.petrotype_select_all, 0)
-        self.petrotype_remove_selection = wx.Button(self, label="Снять выделение")
+        self.petrotype_remove_selection = wx.Button(p, label="Снять выделение")
         self.petrotype_select_all.Bind(wx.EVT_BUTTON, self.on_petrotype_select_all)
         self.petrotype_remove_selection.Bind(wx.EVT_BUTTON, self.on_petrotype_remove_selection)
         btn_sz.Add(self.petrotype_remove_selection)
-        sz_in.Add(btn_sz)
-        self.field_petrotypes = wx.CheckListBox(self, size=wx.Size(-1, 100))
-        sz_in.Add(self.field_petrotypes, 0, wx.EXPAND)
+        p_sz.Add(btn_sz)
+        self.field_petrotypes = wx.CheckListBox(p, size=wx.Size(-1, 100))
+        p_sz.Add(self.field_petrotypes, 0, wx.EXPAND)
+        p.SetSizer(p_sz)
+        sz_in.Add(self.petrotype_colpane, 0, wx.GROW)
+
         sz.Add(sz_in, 1, wx.EXPAND | wx.ALL, border=10)
         self.SetSizer(sz)
         self.Layout()
         self.load()
         self.set_filter_fields()
-        self.SetVirtualSize(self.GetBestSize() + (250, 250))
+        self.SetMinSize((250, 250))
         self.SetScrollRate(10, 10)
+        self.FitInside()
 
     def on_test_series_select_all(self, event):
         for i in range(self.test_series.GetCount()):
@@ -362,7 +412,6 @@ class FmsGridModel(Model):
         if self.filter.use_filter and self.filter.test_series is not None:
             query = query.filter(lambda a: a.pm_sample_set.pm_test_series in self.filter.test_series)
 
-        # TODO: Фильтрация по self.filter
         self.property_columns = {}
         samples = query[:]
         # Выбираем все свойства - значения которых записны для выбранных образцов
@@ -382,12 +431,14 @@ class FmsGridModel(Model):
                 property.Code, FloatCellType(), name_short=name, name_long=name
             )
             if not is_compact:
+                # Если расширенный режим - добавляем метод испытания с кодом "<код_свойства>_method"
                 self.property_columns[property.Code + "_method"] = Column(
                     "%s_method" % property.Code, StringCellType(), name_short="Метод", name_long="Метод"
                 )
 
         # Добавляем все образцы в строки таблицы
         for sample in query:
+            # Набиваем все для обоих режимов, дальше исходя из заголовка таблица заберет то что нужно
             row = {
                 "test_series": sample.pm_sample_set.pm_test_series.Name,
                 "mine_object": sample.pm_sample_set.mine_object.Name,
@@ -443,7 +494,7 @@ class FmsTable(wx.Panel):
         self.left_notebook.AddPage(self.filter_panel, "Фильтр")
         l_sz.Add(self.left_notebook, 1, wx.EXPAND)
         self.left.SetSizer(l_sz)
-        self.splitter.SplitVertically(self.left, p, 300)
+        self.splitter.SplitVertically(self.left, p, 320)
         self.splitter.SetMinimumPaneSize(250)
         self.splitter.SetSashGravity(0)
         sz.Add(self.splitter, 1, wx.EXPAND)

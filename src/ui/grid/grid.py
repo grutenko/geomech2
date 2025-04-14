@@ -795,7 +795,7 @@ class GridEditor(wx.Panel):
         for row_index in range(self._model.total_rows()):
             for col_index, column in enumerate(self._columns):
                 self._view.SetCellValue(row_index, col_index, self._model.get_value_at(col_index, row_index))
-                # self._view.SetReadOnly(row_index, col_index, self._read_only)
+                self._view.SetReadOnly(row_index, col_index, self._read_only)
 
             self._view.SetRowLabelRenderer(row_index, RowLabelRenderer())
 

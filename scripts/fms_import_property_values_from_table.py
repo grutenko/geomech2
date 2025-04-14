@@ -10,7 +10,7 @@ import sys
 
 import pandas as pd
 import wx
-from pony.orm import commit, db_session, rollback, select
+from pony.orm import db_session, rollback, select
 from rapidfuzz import fuzz, process
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
