@@ -4,7 +4,7 @@ import wx.lib.mixins.gridlabelrenderer
 
 
 class ColLabelRenderer(wx.lib.mixins.gridlabelrenderer.GridDefaultColLabelRenderer):
-    def Draw(self, grid, dc, rect, col):
+    def Draw(self, grid, dc: wx.DC, rect, col):
         hAlign, vAlign = grid.GetColLabelAlignment()
         text = grid.GetColLabelValue(col)
         self.DrawBorder(grid, dc, rect)
@@ -16,6 +16,7 @@ class ColLabelRenderer(wx.lib.mixins.gridlabelrenderer.GridDefaultColLabelRender
                 break
         if grid.GetGridCursorCol() == col or _need_hightlight:
             self.DrawHighlightBorder(grid, dc, rect)
+        dc.SetTextForeground(wx.Colour(50, 50, 50))
         self.DrawText(grid, dc, rect, text, hAlign, vAlign)
 
     def DrawBorder(self, grid, dc, rect):

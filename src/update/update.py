@@ -1,13 +1,13 @@
 import logging
 from typing import Iterator, Tuple
 
-import requests
-
 
 def check_update_available(url: str, appname: str, ver: str) -> bool:
     """
     Проверяет наличие обновлений
     """
+    import requests
+
     try:
         response = requests.get("%s/%s-latest-version.txt" % (url, appname), timeout=1)
         version = response.content.decode()
@@ -28,6 +28,8 @@ def download_update(url: str, appname: str, dest: str) -> Iterator[Tuple[int, in
     """
     Скачивает обновление в файл dest
     """
+    import requests
+
     response = requests.get("%s%s-latest.exe" % (url, appname), stream=True, timeout=1)
     total_size = int(response.headers.get("content-length", 0))
     block_size = 4096
@@ -48,6 +50,8 @@ def download_checksum(url: str, appname: str) -> str:
     """
     Скачивает контрольную сумму
     """
+    import requests
+
     data = None
     try:
         response = requests.get("%s/%s-latest.sha256" % (url, appname), timeout=1)

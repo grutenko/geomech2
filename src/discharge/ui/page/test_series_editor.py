@@ -560,6 +560,7 @@ class TestSeriesEditor(wx.Panel):
             app_ctx().main.statusbar,
             header_height=45,
         )
+        self.grid.auto_size_columns()
         p_sz.Add(self.grid, 1, wx.EXPAND)
         p.SetSizer(p_sz)
         self.right.AddPage(p, "Замеры", imageId=self.table_icon)

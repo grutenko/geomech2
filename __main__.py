@@ -8,7 +8,6 @@ from pony.orm import Database, DBException, db_session
 
 import src.database
 from src.config import Config, flush, load_from_file
-from src.console.database import connect as connect_local_scripts_database
 from src.ctx import app_ctx
 from src.resourcelocation import resource_path
 from src.ui.windows.login import LoginDialog
@@ -130,8 +129,6 @@ if __name__ == "__main__":
             _start_accept = True
     else:
         _start_accept = True
-
-    connect_local_scripts_database()
 
     if _start_accept:
         cfg = app_ctx().config

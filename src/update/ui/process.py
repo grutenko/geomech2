@@ -1,6 +1,3 @@
-import tempfile
-import threading
-
 import wx
 
 from ..update import download_update
@@ -23,7 +20,11 @@ class UpdateProcess(wx.Dialog):
         self.thread = None
         self.exception = None
         self.is_cancel = False
-        super().__init__(parent, title="Обновление", style=wx.DEFAULT_DIALOG_STYLE & ~(wx.CLOSE_BOX | wx.MINIMIZE_BOX | wx.MAXIMIZE_BOX) | wx.STAY_ON_TOP)
+        super().__init__(
+            parent,
+            title="Обновление",
+            style=wx.DEFAULT_DIALOG_STYLE & ~(wx.CLOSE_BOX | wx.MINIMIZE_BOX | wx.MAXIMIZE_BOX) | wx.STAY_ON_TOP,
+        )
         self.CenterOnScreen()
         sz = wx.BoxSizer(wx.VERTICAL)
         sz_in = wx.BoxSizer(wx.VERTICAL)
@@ -45,6 +46,9 @@ class UpdateProcess(wx.Dialog):
         self.is_cancel = True
 
     def start(self):
+        import tempfile
+        import threading
+
         file = tempfile.NamedTemporaryFile(delete=False)
         file.close()
         self.dest = file.name
@@ -56,7 +60,10 @@ class UpdateProcess(wx.Dialog):
                         break
                     wx.CallAfter(self.gauge.SetRange, total)
                     wx.CallAfter(self.gauge.SetValue, progress)
-                    wx.CallAfter(self.text.SetLabelText, "Идет скачиваение обновления... (%s / %s)" % (sizeof_human(progress), sizeof_human(total)))
+                    wx.CallAfter(
+                        self.text.SetLabelText,
+                        "Идет скачиваение обновления... (%s / %s)" % (sizeof_human(progress), sizeof_human(total)),
+                    )
             except Exception as e:
                 self.exception = e
             finally:

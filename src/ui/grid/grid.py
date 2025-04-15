@@ -3,13 +3,11 @@ import io
 from dataclasses import dataclass
 from typing import List, Protocol
 
-import pandas as pd
 import wx
 import wx.grid
 import wx.lib.agw.flatnotebook
 import wx.lib.mixins.gridlabelrenderer
 import wx.lib.newevent
-import xlwings as xw
 from wx.grid import GridCellEditor, GridCellRenderer, GridCellStringRenderer, GridCellTextEditor
 
 from src.ui.icon import get_art, get_icon
@@ -409,6 +407,26 @@ class CustomGrid(wx.grid.Grid, wx.lib.mixins.gridlabelrenderer.GridWithLabelRend
         wx.lib.mixins.gridlabelrenderer.GridWithLabelRenderersMixin.__init__(self)
         self.SetScrollRate(1, 100)
         self.SetGridLineColour(wx.Colour(50, 50, 50))
+        self.row_label_renderer = RowLabelRenderer()
+        self.col_label_renderer = ColLabelRenderer()
+        self.SetDefaultRowLabelRenderer(self.row_label_renderer)
+        self.SetDefaultColLabelRenderer(self.col_label_renderer)
+        self.SetDoubleBuffered(True)
+        self.DisableDragRowSize()
+        self.SetSelectionBackground(wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT))
+        self.EnableDragRowSize(True)
+        self.SetRowLabelSize(30)
+        self.CreateGrid(0, 0)
+        self.EnableEditing(True)
+        self.SetColMinimalAcceptableWidth(2)
+        self.SetRowMinimalAcceptableHeight(20)
+        self.GridLineColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_ACTIVEBORDER)
+        font: wx.Font = self.GetLabelFont()
+        info: wx.NativeFontInfo = font.GetNativeFontInfo()
+        info.SetNumericWeight(600)
+        info.SetPointSize(9)
+        font.SetNativeFontInfo(info)
+        self.SetLabelFont(font)
 
 
 class GridEditor(wx.Panel):
@@ -428,20 +446,11 @@ class GridEditor(wx.Panel):
         main_sizer.Add(self._splitter, 1, wx.EXPAND)
 
         self._view = CustomGrid(self._hor_splitter, style=wx.WANTS_CHARS | wx.BORDER_NONE | wx.WS_EX_PROCESS_UI_UPDATES)
-        self._view.SetDoubleBuffered(True)
-        self._view.DisableDragRowSize()
-        self._view.SetSelectionBackground(wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT))
-        self._view.EnableDragRowSize(True)
-        self._view.SetRowLabelSize(30)
         if header_height == -1:
             height = header_height
         else:
             height = header_height
         self._view.SetColLabelSize(height)
-        self._view.CreateGrid(0, 0)
-        self._view.EnableEditing(True)
-        self._view.SetColMinimalAcceptableWidth(2)
-        self._view.SetRowMinimalAcceptableHeight(20)
         self._zoom = 1
         self._original_row_size = 20
         initial_columns = []
@@ -449,14 +458,6 @@ class GridEditor(wx.Panel):
             initial_columns.append([column.init_width if column.init_width > 0 else 100, column.id])
         self._original_col_sizes = initial_columns
         self._original_font_size = 9
-
-        self._view.GridLineColour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_ACTIVEBORDER)
-        font: wx.Font = self._view.GetLabelFont()
-        info: wx.NativeFontInfo = font.GetNativeFontInfo()
-        info.SetNumericWeight(400)
-        info.SetPointSize(9)
-        font.SetNativeFontInfo(info)
-        self._view.SetLabelFont(font)
 
         self._hor_splitter.SetSashGravity(1)
         self._hor_splitter.SetMinimumPaneSize(250)
@@ -762,18 +763,6 @@ class GridEditor(wx.Panel):
         last_cursor_pos = self._last_cursor_pos
         self._columns = self._model.get_columns()
         # Обновление данных о размеразх столбцов удаление несуществующих столбцов, пересортировка
-        new_column_sizes = []
-        column: Column
-        for column in self._columns:
-            finded = False
-            for index, (size, column_id) in enumerate(self._original_col_sizes):
-                if column_id == column.id:
-                    new_column_sizes.append([size, column_id])
-                    finded = True
-                    break
-            if not finded:
-                new_column_sizes.append([column.init_width, column.id])
-        self._original_col_sizes = new_column_sizes
 
         if self._view.GetNumberRows() > 0:
             self._view.DeleteRows(0, self._view.GetNumberRows())
@@ -790,14 +779,14 @@ class GridEditor(wx.Panel):
             editor = column.cell_type.get_grid_editor()
             attr.SetEditor(editor)
             self._view.SetColAttr(col_index, attr)
-            self._view.SetColLabelRenderer(col_index, ColLabelRenderer())
 
         for row_index in range(self._model.total_rows()):
             for col_index, column in enumerate(self._columns):
                 self._view.SetCellValue(row_index, col_index, self._model.get_value_at(col_index, row_index))
                 self._view.SetReadOnly(row_index, col_index, self._read_only)
-
-            self._view.SetRowLabelRenderer(row_index, RowLabelRenderer())
+            if row_index % 2 == 0:
+                for col_index, column in enumerate(self._columns):
+                    self._view.GetOrCreateCellAttr(row_index, col_index).SetBackgroundColour(wx.Colour(240, 240, 240))
 
         # self._render_sizing(begin_batch=False)
 
@@ -891,6 +880,9 @@ class GridEditor(wx.Panel):
             self.model = model
 
         def run(self):
+            import pandas as pd
+            import xlwings as xw
+
             columns = self.model.get_columns()
             columns_names = list(map(lambda a: a.name_short, columns))
             rows = []

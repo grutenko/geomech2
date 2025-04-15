@@ -34,7 +34,9 @@ class Deputy(wx.Panel):
 
 class SettingsWindow(wx.Dialog):
     def __init__(self, parent):
-        super().__init__(parent, title="Настройки", size=wx.Size(700, 350), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+        super().__init__(
+            parent, title="Настройки", size=wx.Size(700, 350), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER
+        )
         self.SetIcon(wx.Icon(get_icon("logo")))
         sz = wx.BoxSizer(wx.VERTICAL)
         self.splitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)

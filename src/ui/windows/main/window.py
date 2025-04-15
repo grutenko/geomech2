@@ -5,30 +5,10 @@ import wx
 import wx.aui
 from pony.orm import db_session
 
-import src.bore_hole.ui.page.bore_hole_editor
-import src.discharge.ui.page.list
-import src.discharge.ui.page.test_series_editor
-import src.fms.ui.page.fms
-import src.fms.ui.page.sample_set_editor
-import src.fms.ui.page.test_series_editor
-import src.fms.ui.page.tree
-import src.map.ui.page.map
-import src.mine_object.ui.page.mine_object_editor
-import src.objects.ui.page.tree
-import src.orig_sample_set.ui.page.disperse_editor
-import src.orig_sample_set.ui.page.stuf_editor
-import src.rock_burst.ui.page.editor
-import src.rock_burst.ui.page.list
-import src.station.ui.page.station_editor
-from src.config import flush
 from src.ctx import app_ctx
-from src.database import is_entity
-from src.document.ui.page.document_editor import DocumentEditor
-from src.document.ui.page.documents import Documents
+from src.database import BoreHole, MineObject, Station, is_entity
 from src.ui.icon import get_icon
 from src.ui.page import EVT_PAGE_HDR_CHANGED
-from src.ui.windows.login import LoginDialog
-from src.ui.windows.settings.window import SettingsWindow
 
 from .actions import (
     ID_CHANGE_CREDENTIALS,
@@ -101,60 +81,76 @@ class MainWindow(wx.Frame):
         self.Show()
 
         def mine_object_editor_def(o=None, is_new=False, parent_object=None, tab_index=0):
-            return src.mine_object.ui.page.mine_object_editor.MineObjectEditor(
-                self.notebook, o, parent_object, is_new, tab_index
-            )
+            from src.mine_object.ui.page.mine_object_editor import MineObjectEditor
+
+            return MineObjectEditor(self.notebook, o, parent_object, is_new, tab_index)
 
         def station_editor_def(o=None, is_new=False, parent_object=None):
-            return src.station.ui.page.station_editor.StationEditor(
-                self.notebook, is_new=is_new, o=o, parent_object=parent_object
-            )
+            from src.station.ui.page.station_editor import StationEditor
+
+            return StationEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
         def bore_hole_editor_def(o=None, is_new=False, parent_object=None):
-            return src.bore_hole.ui.page.bore_hole_editor.BoreHoleEditor(
-                self.notebook, is_new=is_new, o=o, parent_object=parent_object
-            )
+            from src.bore_hole.ui.page.bore_hole_editor import BoreHoleEditor
+
+            return BoreHoleEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
         def rock_burst_editor_def(o=None, is_new=False, parent_object=None):
-            return src.rock_burst.ui.page.editor.RockBurstEditor(
-                self.notebook, o=o, is_new=is_new, parent_object=parent_object
-            )
+            from src.rock_burst.ui.page.editor import RockBurstEditor
+
+            return RockBurstEditor(self.notebook, o=o, is_new=is_new, parent_object=parent_object)
 
         def pm_sample_set_editor_def(o=None, is_new=False, parent_object=None):
-            return src.fms.ui.page.sample_set_editor.PmSampleSetEditor(
-                self.notebook, is_new=is_new, o=o, parent_object=parent_object
-            )
+            from src.fms.ui.page.sample_set_editor import PmSampleSetEditor
+
+            return PmSampleSetEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
         def test_series_editor_def(o=None, is_new=False, parent_object=None):
-            return src.discharge.ui.page.test_series_editor.TestSeriesEditor(
-                self.notebook, is_new=is_new, o=o, parent_object=parent_object
-            )
+            from src.discharge.ui.page.test_series_editor import TestSeriesEditor
+
+            return TestSeriesEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
         def pm_test_series_editor_def(o=None, is_new=False, parent_object=None):
-            return src.fms.ui.page.test_series_editor.PmTestSeriesEditor(
-                self.notebook, is_new=is_new, o=o, parent_object=parent_object
-            )
+
+            from src.fms.ui.page.test_series_editor import PmTestSeriesEditor
+
+            return PmTestSeriesEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
         def documents_editor_def(o=None, is_new=False, parent_object=None):
+            from src.document.ui.page.document_editor import DocumentEditor
+
             return DocumentEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
-        def stuf_editor_def(o=None, is_new=False, parent_object=None):
-            return src.orig_sample_set.ui.page.stuf_editor.StufEditor(
-                self.notebook, is_new=is_new, o=o, parent_object=parent_object
-            )
+        def documents_list_def():
+            from src.document.ui.page.documents import Documents
 
-        def disperse_editor_def(o=None, is_new=False, parent_object=None):
-            return src.orig_sample_set.ui.page.disperse_editor.DisperseEditor(
-                self.notebook, is_new=is_new, o=o, parent_object=parent_object
-            )
+            return Documents(self.notebook)
+
+        def tree_def():
+            from src.objects.ui.page.tree import PageTree
+
+            return PageTree(self.notebook)
+
+        def fms_def():
+            from src.fms.ui.page.fms import FmsPage
+
+            return FmsPage(self.notebook)
+
+        def rock_burst_list_def():
+            from src.rock_burst.ui.page.list import RockBurstWidget
+
+            return RockBurstWidget(self.notebook)
+
+        def discharge_list_def():
+            from src.discharge.ui.page.list import DischargeList
+
+            return DischargeList(self.notebook)
 
         self.page_def = {
-            "tree": lambda **kwds: src.objects.ui.page.tree.PageTree(self.notebook),
-            "fms": lambda **kwds: src.fms.ui.page.fms.FmsPage(self.notebook),
-            "rock_burst_list": lambda **kwds: src.rock_burst.ui.page.list.RockBurstWidget(self.notebook),
-            "discharge_list": lambda **kwds: src.discharge.ui.page.list.DischargeList(self.notebook),
-            # "console_editor": lambda **kwds: src.console.ui.page.script_editor.ScriptEditor(self.notebook),
-            "map": lambda **kwds: src.map.ui.page.map.Map(self.notebook),
+            "tree": tree_def,
+            "fms": fms_def,
+            "rock_burst_list": rock_burst_list_def,
+            "discharge_list": discharge_list_def,
             "pm_sample_set_editor": pm_sample_set_editor_def,
             "pm_test_series_editor": pm_test_series_editor_def,
             "rock_burst_editor": rock_burst_editor_def,
@@ -162,7 +158,7 @@ class MainWindow(wx.Frame):
             "station_editor": station_editor_def,
             "bore_hole_editor": bore_hole_editor_def,
             "test_series_editor": test_series_editor_def,
-            "documents_list": lambda **kwds: Documents(self.notebook),
+            "documents_list": documents_list_def,
             "document_editor": documents_editor_def,
             "stuf_editor": stuf_editor_def,
             "disperse_editor": disperse_editor_def,
@@ -201,7 +197,7 @@ class MainWindow(wx.Frame):
         self.pages = []
 
         self.bind_all()
-        self.setttings_wnd = SettingsWindow(self)
+        self.setttings_wnd = None
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
     def on_close(self, event):
@@ -249,6 +245,10 @@ class MainWindow(wx.Frame):
             self.close(_ctx.o)
 
     def on_open_settings(self, event):
+        from src.ui.windows.settings.window import SettingsWindow
+
+        if self.setttings_wnd is None:
+            self.setttings_wnd = SettingsWindow(self)
         self.setttings_wnd.ShowWindowModal()
 
     def on_open_discharge_list(self, event):
@@ -315,6 +315,8 @@ class MainWindow(wx.Frame):
             self.close(_ctx.o)
 
     def on_change_credentials(self, event):
+        from src.ui.windows.login import LoginDialog
+
         dlg = LoginDialog(self, mode="CHANGE_CREDENTIALS")
         if dlg.ShowModal() == wx.ID_OK:
             wx.MessageBox(
