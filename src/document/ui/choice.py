@@ -69,7 +69,7 @@ class Choice(wx.Panel):
         self.choice.Append("Без документа")
         for o in select(o for o in FoundationDocument):
             self.items.append(o)
-            self.choice.Append(o.Name)
+            self.choice.Append("[%s] %s" % (o.Type, o.Name))
         if self.choice.GetCount() > 0:
             self.choice.SetSelection(0)
         if self.selection is not None:

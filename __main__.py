@@ -9,11 +9,7 @@ from pony.orm import Database, DBException, db_session
 import src.database
 from src.config import Config, flush, load_from_file
 from src.ctx import app_ctx
-from src.resourcelocation import resource_path
-from src.ui.windows.login import LoginDialog
 from src.ui.windows.main import MainWindow
-from src.update import check_update_available, run_switch_version_script
-from src.update.ui.process import UpdateProcess
 from src.version import version_string
 
 if __name__ == "__main__":
@@ -47,8 +43,6 @@ if __name__ == "__main__":
         format="%(asctime)s - %(levelname)s - %(message)s",  # Формат записи
     )
 
-    wx.Font.AddPrivateFont(resource_path("fonts/SourceCodePro-Regular.ttf"))
-
     config_filename = "%s/config.json" % datadir
     _is_runtime = False
     try:
@@ -70,6 +64,9 @@ if __name__ == "__main__":
 
     # Работа с обновлениями только для Onefile сборки
     if getattr(sys, "frozen", False):
+        from src.update import check_update_available, run_switch_version_script
+        from src.update.ui.process import UpdateProcess
+
         # Проверяет наличие новой версии в переданом сервере обновлений
         if check_update_available(cfg.update_endpoint, cfg.update_appname, version_string):
             ret = wx.MessageBox(
@@ -124,13 +121,18 @@ if __name__ == "__main__":
 
     _start_accept = False
     if _connection_failed:
+        from src.ui.windows.login import LoginDialog
+
         dlg = LoginDialog()
         if dlg.ShowModal() == wx.ID_OK:
             _start_accept = True
+        dlg.Destroy()
     else:
         _start_accept = True
 
     if _start_accept:
+        from src.recently_used import RecentlyUsed
+
         cfg = app_ctx().config
         src.database.connect(
             login=cfg.login, password=cfg.password, host=cfg.host, port=cfg.port, database=cfg.database

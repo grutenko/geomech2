@@ -27,7 +27,7 @@ from src.ui.icon import get_icon
 
 @dataclass
 class Filter:
-    use_filter: bool = False
+    use_filter: bool = True
     test_series: List[PMTestSeries] = None
     fields: List[MineObject] = None
     petrotypes: List[Petrotype] = None
@@ -74,6 +74,7 @@ class xCollapsiblePane(wx.Panel):
 class FilterPanel(wx.ScrolledWindow):
     def __init__(self, parent, filter):
         super().__init__(parent, style=wx.VSCROLL)
+        self.SetBackgroundColour(wx.Colour(255, 255, 255))
         self.filter: Filter = filter
         self.fields_items = []
         self.petrotypes_items = []
@@ -81,6 +82,7 @@ class FilterPanel(wx.ScrolledWindow):
         sz = wx.BoxSizer(wx.VERTICAL)
         self.toolbar = wx.ToolBar(self, style=wx.TB_FLAT | wx.TB_HORZ_TEXT)
         self.toolbar.AddTool(wx.ID_APPLY, "Применить", get_icon("filter"))
+        self.toolbar.AddTool(wx.ID_CLEAR, "Сбросить", get_icon("filter-clear"))
         self.toolbar.Bind(wx.EVT_TOOL, self.on_apply, id=wx.ID_APPLY)
         self.toolbar.Realize()
         sz.Add(self.toolbar, 0, wx.EXPAND)
@@ -88,6 +90,8 @@ class FilterPanel(wx.ScrolledWindow):
         self.use_filter_checkbox = wx.CheckBox(self, label="Использовать фильтр")
         self.use_filter_checkbox.Bind(wx.EVT_CHECKBOX, self.on_use_filter)
         sz_in.Add(self.use_filter_checkbox, 0, wx.EXPAND | wx.BOTTOM, border=10)
+        self.use_filter_checkbox.SetValue(True)
+        self.use_filter_checkbox.Hide()
 
         self.contracts_colpane = xCollapsiblePane(self, label="Договоры")
         p = self.contracts_colpane.GetPane()
@@ -338,21 +342,23 @@ class FmsGridModel(Model):
             ),
         }
         self.property_columns = {}
+        self.columns_cache = list(self.compact_columns.values()) + list(self.property_columns.values())
         self.rows = []
         self.filter = Filter()
 
-    def get_columns(self):
+    def make_columns_cache(self):
         if self.mode == "compact":
-            return list(self.compact_columns.values()) + list(self.property_columns.values())
+            self.columns_cache = list(self.compact_columns.values()) + list(self.property_columns.values())
         else:
-            return list(self.extended_columns.values()) + list(self.property_columns.values())
+            self.columns_cache = list(self.extended_columns.values()) + list(self.property_columns.values())
+
+    def get_columns(self):
+        return self.columns_cache
 
     def get_value_at(self, col, row) -> str:
-        columns = self.get_columns()
-        column = columns[col]
-        row = self.rows[row]
-        if column.id in row:
-            return row[column.id]
+        col_id = self.columns_cache.__getitem__(col).id
+        if col_id in self.rows[row]:
+            return self.rows[row][col_id]
         return ""
 
     def get_rows_count(self) -> int:
@@ -458,6 +464,7 @@ class FmsGridModel(Model):
                 row["%s_method" % value.pm_property.Code] = str(value.pm_test_method.Name)
             self.rows.append(row)
 
+        self.make_columns_cache()
         end_time = time.perf_counter()
         app_ctx().main.statusbar.SetStatusText("Время генерации: %f с." % (end_time - start_time), 3)
 
@@ -494,7 +501,7 @@ class FmsTable(wx.Panel):
         self.left_notebook.AddPage(self.filter_panel, "Фильтр")
         l_sz.Add(self.left_notebook, 1, wx.EXPAND)
         self.left.SetSizer(l_sz)
-        self.splitter.SplitVertically(self.left, p, 320)
+        self.splitter.SplitVertically(self.left, p, 280)
         self.splitter.SetMinimumPaneSize(250)
         self.splitter.SetSashGravity(0)
         sz.Add(self.splitter, 1, wx.EXPAND)

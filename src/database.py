@@ -519,7 +519,7 @@ class PMTestSeries(db.Entity):
         return self.Number
 
     def get_tree_name(self):
-        return "[Набор испытаний] " + self.Name
+        return "[Договор] " + self.Name
 
     @property
     def sp_own_type(self):
@@ -574,6 +574,7 @@ class PMSample(db.Entity):
     Length2 = Optional(float, column="Length2")
     Height = Optional(float, column="Height")
     MassAirDry = Optional(float, column="MassAirDry")
+    EndTestDate = Optional(int, column="EndTestDate", size=64)
 
     @property
     def Name(self):

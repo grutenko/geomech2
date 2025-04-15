@@ -14,6 +14,8 @@ from src.ui.tree import (
     TreeWidget,
 )
 
+from .fms_db_import import FmsImportDialog
+
 
 class _PmSampleSet_Node(TreeNode):
     def __init__(self, o):
@@ -105,6 +107,9 @@ class TreePage(wx.Panel):
         self.toolbar.AddTool(wx.ID_EDIT, "Изменить", get_icon("edit"))
         self.toolbar.Bind(wx.EVT_TOOL, self.on_edit, id=wx.ID_EDIT)
         self.toolbar.AddTool(wx.ID_DELETE, "Удалить", get_icon("delete"))
+        self.toolbar.AddSeparator()
+        self.toolbar.AddTool(wx.ID_CONVERT, "Импорт", get_icon("import"))
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_import, id=wx.ID_CONVERT)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_delete, id=wx.ID_DELETE)
         self.toolbar.EnableTool(wx.ID_EDIT, False)
         self.toolbar.EnableTool(wx.ID_DELETE, False)
@@ -138,6 +143,12 @@ class TreePage(wx.Panel):
             i = m.Append(wx.ID_DELETE, "Удалить")
             i.SetBitmap(get_icon("delete"))
         self.PopupMenu(m, event.point)
+
+    def on_import(self, event):
+        dlg = FmsImportDialog(self)
+        if dlg.ShowModal() == wx.ID_OK:
+            ...
+        dlg.Destroy()
 
     def on_activate(self, event):
         if isinstance(event.node, _PmSampleSet_Node):

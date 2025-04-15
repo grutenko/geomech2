@@ -13,7 +13,7 @@ class PmTestSeriesEditor(wx.Panel):
     def get_name(self):
         if self.is_new:
             return "(новый)"
-        return "[Набор испытаний] %s" % self.o.Name
+        return self.o.get_tree_name()
 
     def get_icon(self):
         return get_icon("file")

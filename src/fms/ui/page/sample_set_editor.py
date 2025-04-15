@@ -1,8 +1,8 @@
 import wx
-from pony.orm import db_session, select
+import wx.lib.agw.flatnotebook
+from pony.orm import db_session
 
-from src.database import Petrotype, PetrotypeStruct
-from src.mine_object.ui.choice import Choice as MineObjectChoice
+from src.database import PMTestSeries
 from src.ui.icon import get_icon
 from src.ui.supplied_data import SuppliedDataWidget
 from src.ui.validators import DateValidator, TextValidator
@@ -116,7 +116,9 @@ class PmSampleSetEditor(wx.Panel):
         self.left.SetSizer(p_sz)
         self.left.SetVirtualSize(self.left.GetBestSize() + (250, 250))
         self.left.SetScrollRate(10, 10)
-        self.right = wx.Notebook(self.splitter)
+        self.right = wx.lib.agw.flatnotebook.FlatNotebookCompatible(
+            self.splitter, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON
+        )
         self.samples = SamplesWidget(self.right)
         self.right.AddPage(self.samples, "Образцы")
         self.supplied_data = SuppliedDataWidget(self.right, deputy_text="Недоступно для новых объектов.")
@@ -133,26 +135,11 @@ class PmSampleSetEditor(wx.Panel):
             self.samples.start(self.o)
 
     @db_session
-    def _on_select_petrotype(self, event=None):
-        _text = self.field_petrotype.GetValue()
-        _petrotype = select(o for o in Petrotype if o.Name.lower() == _text.lower()).first()
-        if _petrotype is not None:
-            _petrotype_structs = select(o for o in PetrotypeStruct if o.petrotype == _petrotype)
-            self._petrotype_structs = _petrotype_structs
-            self.field_petrotype_struct.Clear()
-            for o in _petrotype_structs:
-                self.field_petrotype_struct.Append(o.Name.strip())
-            if len(_petrotype_structs) > 0:
-                self.field_petrotype_struct.SetSelection(0)
-        else:
-            self.field_petrotype_struct.Clear()
-        if event is not None:
-            event.Skip()
-
     def get_name(self):
         if self.is_new:
-            return "(новый) Проба"
-        return "[Проба] " + self.o.Name
+            return "(новый)"
+
+        return "%s %s" % (PMTestSeries[self.o.pm_test_series.RID].get_tree_name(), self.o.get_tree_name())
 
     def get_icon(self):
         return get_icon("file")

@@ -1,5 +1,6 @@
 import pubsub.pub
 import wx
+import wx.lib.agw.flatnotebook
 import wx.propgrid
 from pony.orm import commit, db_session, select
 
@@ -61,7 +62,9 @@ class MineObjectEditor(wx.Panel):
 
         self.image_list = wx.ImageList(16, 16)
         self.file_icon = self.image_list.Add(get_icon("file"))
-        self.right = wx.Notebook(self.splitter)
+        self.right = wx.lib.agw.flatnotebook.FlatNotebookCompatible(
+            self.splitter, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON
+        )
         self.right.AssignImageList(self.image_list)
         self.supplied_data = SuppliedDataWidget(
             self.right, deputy_text="Недоступно для новых объектов. Сначала сохраните."

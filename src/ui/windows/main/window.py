@@ -206,10 +206,6 @@ class MainWindow(wx.Frame):
         cfg.height = self.GetSize().GetHeight()
         cfg.x = self.GetPosition().Get().__getitem__(0)
         cfg.y = self.GetPosition().Get().__getitem__(1)
-        if not app_ctx().config_is_fallback_runtime:
-            flush(cfg, app_ctx().config_filename)
-        self.setttings_wnd.Close()
-        self.setttings_wnd.Destroy()
         wx.Exit()
         event.Skip()
 

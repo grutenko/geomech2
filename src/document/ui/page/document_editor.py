@@ -1,5 +1,6 @@
 import pubsub.pub
 import wx
+import wx.lib.agw.flatnotebook
 from pony.orm import commit, db_session, select
 
 from src.ctx import app_ctx
@@ -50,7 +51,9 @@ class DocumentEditor(wx.Panel):
         self.left.SetSizer(p_sz)
         self.left.SetVirtualSize(self.left.GetBestSize() + (250, 250))
         self.left.SetScrollRate(10, 10)
-        self.right = wx.Notebook(self.splitter)
+        self.right = wx.lib.agw.flatnotebook.FlatNotebookCompatible(
+            self.splitter, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON
+        )
         self.supplied_data = SuppliedDataWidget(self.right, deputy_text="Недоступно для новых объектов.")
         self.right.AddPage(self.supplied_data, "Сопутствующие материалы")
         self.splitter.SplitVertically(self.left, self.right, 250)

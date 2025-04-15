@@ -3,7 +3,8 @@ from dataclasses import dataclass, field
 from typing import Dict, Iterable
 
 import wx
-from pony.orm import commit, db_session, select
+import wx.lib.agw.flatnotebook
+from pony.orm import commit, count, db_session, select
 from wx.grid import GridCellAutoWrapStringEditor, GridCellEditor, GridCellRenderer, GridCellStringRenderer
 
 from src.bore_hole.ui.choice import Choice as BoreHoleChoice
@@ -529,7 +530,9 @@ class TestSeriesEditor(wx.Panel):
 
         self.image_list = wx.ImageList(16, 16)
         self.table_icon = self.image_list.Add(get_icon("table"))
-        self.right = wx.Notebook(self.splitter)
+        self.right = wx.lib.agw.flatnotebook.FlatNotebookCompatible(
+            self.splitter, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON
+        )
         self.right.AssignImageList(self.image_list)
         p = wx.Panel(self.right)
         p_sz = wx.BoxSizer(wx.VERTICAL)

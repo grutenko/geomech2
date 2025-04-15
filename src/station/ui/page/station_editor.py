@@ -1,5 +1,6 @@
 import pubsub.pub
 import wx
+import wx.lib.agw.flatnotebook
 import wx.propgrid
 from pony.orm import commit, db_session, select
 
@@ -65,7 +66,9 @@ class StationEditor(wx.Panel):
         self.left.SetVirtualSize(self.left.GetBestSize() + (250, 250))
         self.left.SetScrollRate(10, 10)
 
-        self.right = wx.Notebook(self.splitter)
+        self.right = wx.lib.agw.flatnotebook.FlatNotebookCompatible(
+            self.splitter, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON
+        )
         self.supplied_data = SuppliedDataWidget(
             self.right, deputy_text="Недоступно для новых объектов. Сначала сохраните."
         )
