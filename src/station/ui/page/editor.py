@@ -98,7 +98,6 @@ class StationEditor(wx.Panel):
             self.set_fields()
             self.field_mine_object.Disable()
             self.supplied_data.start(self.o)
-            app_ctx().recently_used.remember("tree", self.o.__class__.__qualname__, self.o.RID)
         elif parent_object is not None:
             self.field_mine_object.SetValue(parent_object)
 

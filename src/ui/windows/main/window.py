@@ -81,17 +81,17 @@ class MainWindow(wx.Frame):
         self.Show()
 
         def mine_object_editor_def(o=None, is_new=False, parent_object=None, tab_index=0):
-            from src.mine_object.ui.page.mine_object_editor import MineObjectEditor
+            from mine_object.ui.page.editor import MineObjectEditor
 
             return MineObjectEditor(self.notebook, o, parent_object, is_new, tab_index)
 
         def station_editor_def(o=None, is_new=False, parent_object=None):
-            from src.station.ui.page.station_editor import StationEditor
+            from station.ui.page.editor import StationEditor
 
             return StationEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
         def bore_hole_editor_def(o=None, is_new=False, parent_object=None):
-            from src.bore_hole.ui.page.bore_hole_editor import BoreHoleEditor
+            from bore_hole.ui.page.editor import BoreHoleEditor
 
             return BoreHoleEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
@@ -101,7 +101,7 @@ class MainWindow(wx.Frame):
             return RockBurstEditor(self.notebook, o=o, is_new=is_new, parent_object=parent_object)
 
         def pm_sample_set_editor_def(o=None, is_new=False, parent_object=None):
-            from src.fms.ui.page.sample_set_editor import PmSampleSetEditor
+            from fms.ui.page.editor import PmSampleSetEditor
 
             return PmSampleSetEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
@@ -117,12 +117,12 @@ class MainWindow(wx.Frame):
             return PmTestSeriesEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
         def documents_editor_def(o=None, is_new=False, parent_object=None):
-            from src.document.ui.page.document_editor import DocumentEditor
+            from document.ui.page.editor import DocumentEditor
 
             return DocumentEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
         def documents_list_def():
-            from src.document.ui.page.documents import Documents
+            from document.ui.page.list import Documents
 
             return Documents(self.notebook)
 
