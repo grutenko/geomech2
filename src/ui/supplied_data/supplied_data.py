@@ -287,32 +287,33 @@ class SuppliedDataWidget(wx.Panel):
     @db_session
     def load(self):
         import os
+        import re
 
         self.tree.DeleteAllItems()
         self.items = []
         self.tree_root = self.tree.AddRoot(self.o.get_tree_name(), image=self.icon_book, selImage=self.icon_book)
         for sp in select(o for o in SuppliedData if o.OwnID == self.o.RID and o.OwnType == self.o.sp_own_type):
+            name = re.sub(r"\s+", " ", sp.Name)
+            comment = re.sub(r"\s+", " ", sp.Comment) if sp.Comment is not None else ""
             sp_item = self.tree.AppendItem(
-                self.tree_root, sp.Name, image=self.icon_folder, selImage=self.icon_folder_open, data=sp
+                self.tree_root, name, image=self.icon_folder, selImage=self.icon_folder_open, data=sp
             )
             self.tree.SetItemText(sp_item, "Папка", column=1)
             self.tree.SetItemText(sp_item, "---", column=2)
             self.tree.SetItemText(sp_item, str(decode_date(sp.DataDate)) if sp.DataDate is not None else "", column=3)
-            self.tree.SetItemText(sp_item, sp.Comment if sp.Comment is not None else "", column=4)
+            self.tree.SetItemText(sp_item, comment, column=4)
             self.items.append(sp)
             for sp_part in select(o for o in SuppliedDataPart if o.parent == sp):
                 _, ext = os.path.splitext(sp_part.FileName)
-                sp_part_item = self.tree.AppendItem(
-                    sp_item, sp_part.Name.strip(), image=self.apply_ext_icon(ext), data=sp_part
-                )
+                name = re.sub(r"\s+", " ", sp_part.Name)
+                comment = re.sub(r"\s+", " ", sp_part.Comment) if sp.Comment is not None else ""
+                sp_part_item = self.tree.AppendItem(sp_item, name, image=self.apply_ext_icon(ext), data=sp_part)
                 self.tree.SetItemText(sp_part_item, "Файл", column=1)
                 self.tree.SetItemText(sp_part_item, human_readable_size(sp_part.size()), column=2)
                 self.tree.SetItemText(
                     sp_part_item, str(decode_date(sp_part.DataDate)) if sp_part.DataDate is not None else "", column=3
                 )
-                self.tree.SetItemText(
-                    sp_part_item, sp_part.Comment.strip() if sp_part.Comment is not None else "", column=4
-                )
+                self.tree.SetItemText(sp_part_item, comment, column=4)
                 self.items.append(sp_part)
         self.tree.ExpandAll()
 
