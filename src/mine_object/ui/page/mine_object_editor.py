@@ -7,6 +7,7 @@ from pony.orm import commit, db_session, select
 from src.ctx import app_ctx
 from src.database import CoordSystem, MineObject
 from src.mine_object.ui.choice import Choice as MineObjectChoice
+from src.ui.flatnotebook import xFlatNotebook
 from src.ui.icon import get_icon
 from src.ui.page import PageHdrChangedEvent
 from src.ui.supplied_data import SuppliedDataWidget
@@ -62,9 +63,7 @@ class MineObjectEditor(wx.Panel):
 
         self.image_list = wx.ImageList(16, 16)
         self.file_icon = self.image_list.Add(get_icon("file"))
-        self.right = wx.lib.agw.flatnotebook.FlatNotebookCompatible(
-            self.splitter, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON
-        )
+        self.right = xFlatNotebook(self.splitter, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON)
         self.right.AssignImageList(self.image_list)
         self.supplied_data = SuppliedDataWidget(
             self.right, deputy_text="Недоступно для новых объектов. Сначала сохраните."
@@ -80,7 +79,7 @@ class MineObjectEditor(wx.Panel):
         self.coords.Update()
         self.right.AddPage(self.coords, "Координаты")
         self.right.AddPage(self.supplied_data, "Сопуствующие материалы", imageId=self.file_icon)
-        self.splitter.SplitVertically(self.left, self.right, 250)
+        self.splitter.SplitVertically(self.left, self.right, 270)
         self.splitter.SetMinimumPaneSize(250)
         self.right.SetSelection(tab_index)
         sz.Add(self.splitter, 1, wx.EXPAND)
@@ -96,6 +95,7 @@ class MineObjectEditor(wx.Panel):
             self.field_coord_system.Disable()
             self.set_fields()
         else:
+            self.right.enable_tab(1, enable=False)
             self.field_mine_object.SetValue(self.parent_object)
 
     def set_fields(self):

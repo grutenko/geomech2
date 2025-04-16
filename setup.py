@@ -20,7 +20,6 @@ class BuildExecutable(build_py):
             "--splash=icons/logo.png",
             "--add-data=icons:icons",
             "--name=geomech",
-            "--hidden-import=jedi",
             "--hidden-import=wx._xml",
             "--hidden-import=pony.orm.dbproviders",
             "--hidden-import=pony.orm.dbproviders.postgres",
@@ -36,7 +35,7 @@ class BuildExecutable(build_py):
         else:
             args.append("--icon=icons/logo.ico")
         args.append("__main__.py")
-        os.environ["PYTHONOPTIMIZE"] = "1"
+        os.environ["PYTHONOPTIMIZE"] = "2"
         subprocess.run(
             args, check=True, env=os.environ
         )  # Create a single executable file  # Name of the output file  # Your main script

@@ -14,7 +14,7 @@ from src.ui.tree import (
     TreeWidget,
 )
 
-from .fms_db_import import FmsImportDialog
+from ..fms_db_import import FmsImportDialog
 
 
 class _PmSampleSet_Node(TreeNode):
@@ -25,7 +25,10 @@ class _PmSampleSet_Node(TreeNode):
         return self.o.get_tree_name()
 
     def get_icon(self):
-        return "file", get_icon("file")
+        if self.o.RealDetails:
+            return "file", get_icon("file")
+        else:
+            return "file-search", get_icon("file-search")
 
     def get_parent(self) -> TreeNode:
         return _PmTestSeries_Node(self.o.pm_test_series)
@@ -101,9 +104,6 @@ class TreePage(wx.Panel):
         super().__init__(parent)
         sz = wx.BoxSizer(wx.VERTICAL)
         self.toolbar = wx.ToolBar(self, style=wx.TB_FLAT | wx.TB_HORZ_TEXT)
-        self.toolbar.AddTool(wx.ID_ADD, "Добавить", get_icon("file-add"))
-        self.toolbar.Bind(wx.EVT_TOOL, self.on_add, id=wx.ID_ADD)
-        self.toolbar.AddSeparator()
         self.toolbar.AddTool(wx.ID_EDIT, "Изменить", get_icon("edit"))
         self.toolbar.Bind(wx.EVT_TOOL, self.on_edit, id=wx.ID_EDIT)
         self.toolbar.AddTool(wx.ID_DELETE, "Удалить", get_icon("delete"))
@@ -123,26 +123,10 @@ class TreePage(wx.Panel):
         self.tree.Bind(EVT_WIDGET_TREE_ACTIVATED, self.on_activate)
         self.tree.Bind(EVT_WIDGET_TREE_MENU, self.on_menu)
         self.tree.Bind(EVT_WIDGET_TREE_SEL_CHANGED, self.on_sel_changed)
+        self.current_node = None
 
     def on_sel_changed(self, event):
         self.update_controls_state()
-
-    def on_menu(self, event):
-        m = wx.Menu()
-        if isinstance(event.node, _PmTestSeries_Node):
-            i = m.Append(wx.ID_NEW, "Добавить пробу")
-            i.SetBitmap(get_icon("file-add"))
-            m.AppendSeparator()
-            i = m.Append(wx.ID_EDIT, "Изменить")
-            i.SetBitmap(get_icon("edit"))
-            i = m.Append(wx.ID_DELETE, "Удалить")
-            i.SetBitmap(get_icon("delete"))
-        elif isinstance(event.node, _PmSampleSet_Node):
-            i = m.Append(wx.ID_EDIT, "Изменить")
-            i.SetBitmap(get_icon("edit"))
-            i = m.Append(wx.ID_DELETE, "Удалить")
-            i.SetBitmap(get_icon("delete"))
-        self.PopupMenu(m, event.point)
 
     def on_import(self, event):
         dlg = FmsImportDialog(self)
@@ -156,18 +140,55 @@ class TreePage(wx.Panel):
         elif isinstance(event.node, _PmTestSeries_Node):
             app_ctx().main.open("pm_test_series_editor", is_new=False, o=event.node.o)
 
-    def get_name(self):
-        return "ФМС"
+    def on_edit(self, event):
+        node = self.tree.get_current_node()
+        if node is None:
+            return
+        if isinstance(node, _PmSampleSet_Node):
+            app_ctx().main.open("pm_sample_set_editor", is_new=False, o=node.o)
+        elif isinstance(node, _PmTestSeries_Node):
+            app_ctx().main.open("pm_test_series_editor", is_new=False, o=node.o)
+
+    def on_delete(self, event):
+        node = self.tree.get_current_node()
+        if node is None:
+            return
+        if isinstance(node, _PmSampleSet_Node) and node.o.RealDetails:
+            ...
+        elif isinstance(node, _PmSampleSet_Node) and not node.o.RealDetails:
+            ...
+        elif isinstance(node, _PmTestSeries_Node):
+            ...
+
+    def on_add_sample_set(self, event): ...
+
+    def on_add_approx_sample_set(self, event): ...
+
+    def on_menu(self, event):
+        self.current_node = event.node
+        m = wx.Menu()
+        if isinstance(event.node, _PmSampleSet_Node):
+            i = m.Append(wx.ID_EDIT, "Изменить")
+            i.SetBitmap(get_icon("edit"))
+            m.Bind(wx.EVT_MENU, self.on_edit, i)
+            i = m.Append(wx.ID_DELETE, "Удалить")
+            i.SetBitmap(get_icon("delete"))
+            m.Bind(wx.EVT_MENU, self.on_delete, i)
+        elif isinstance(event.node, _PmTestSeries_Node):
+            i = m.Append(wx.ID_FILE1, "Добавить пробу")
+            i.SetBitmap(get_icon("file"))
+            m.Bind(wx.EVT_MENU, self.on_add_sample_set, i)
+            i = m.Append(wx.ID_FILE2, "Добавить примерную пробу")
+            m.Bind(wx.EVT_MENU, self.on_add_approx_sample_set, i)
+            i.SetBitmap(get_icon("file-search"))
+            i = m.Append(wx.ID_EDIT, "Изменить")
+            m.Bind(wx.EVT_MENU, self.on_edit, i)
+            i.SetBitmap(get_icon("edit"))
+            i = m.Append(wx.ID_DELETE, "Удалить")
+            m.Bind(wx.EVT_MENU, self.on_delete, i)
+            i.SetBitmap(get_icon("delete"))
+        self.PopupMenu(m, event.point)
 
     def update_controls_state(self):
         self.toolbar.EnableTool(wx.ID_EDIT, self.tree.get_current_node() is not None)
         self.toolbar.EnableTool(wx.ID_DELETE, self.tree.get_current_node() is not None)
-
-    def get_icon(self):
-        return get_icon("folder")
-
-    def on_add(self, event): ...
-
-    def on_edit(self, event): ...
-
-    def on_delete(self, event): ...

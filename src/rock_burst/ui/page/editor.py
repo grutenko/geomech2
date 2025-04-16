@@ -1,4 +1,5 @@
 import wx
+import wx.lib.agw.flatnotebook
 import wx.propgrid
 from pony.orm import db_session, desc, select
 from pubsub.pub import subscribe, unsubscribe
@@ -7,6 +8,7 @@ from src.ctx import app_ctx
 from src.database import MineObject, RBCause, RBSign, RBType, RBTypicalCause, RBTypicalSign, RockBurst
 from src.datetimeutil import decode_datetime, encode_datetime
 from src.mine_object.ui.choice import Choice as MineObjectChoice
+from src.ui.flatnotebook import xFlatNotebook
 from src.ui.icon import get_icon
 from src.ui.page import PageHdrChangedEvent
 from src.ui.supplied_data import SuppliedDataWidget
@@ -75,7 +77,7 @@ class RockBurstEditor(wx.Panel):
 
         main_sizer.Add(left_sizer, 0, wx.EXPAND | wx.TOP | wx.LEFT | wx.RIGHT, border=10)
 
-        self.notebook = wx.Notebook(self)
+        self.notebook = xFlatNotebook(self, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON)
 
         self.page_main = wx.Panel(self.notebook)
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -126,6 +128,18 @@ class RockBurstEditor(wx.Panel):
 
         self.SetSizer(top_sizer)
         self.Layout()
+
+        if not self.is_new:
+            self.supplied_data.start(self.o)
+            self.page_prevent_actions.Enable()
+            self.page_causes.Enable()
+            self.page_signs.Enable()
+            self.set_fields()
+        else:
+            self.notebook.enable_tab(1, enable=False)
+            self.notebook.enable_tab(2, enable=False)
+            self.notebook.enable_tab(3, enable=False)
+            self.notebook.enable_tab(4, enable=False)
 
         subscribe(self.on_object_changed, "object.added")
         subscribe(self.on_object_changed, "object.deleted")

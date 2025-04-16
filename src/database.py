@@ -530,6 +530,7 @@ class PMSampleSet(db.Entity):
     _table_ = "PMSampleSets"
 
     mine_object = Required(MineObject, column="MOID")
+    pm_sample_set_property_values = Set("PmSampleSetPropertyValue")
     pm_test_series = Required(PMTestSeries, column="TSID")
     petrotype_struct = Required(PetrotypeStruct, column="PTSID")
     pm_samples = Set("PMSample")
@@ -594,6 +595,7 @@ class PmTestMethod(db.Entity):
     pm_task_methods_for_samples = Set("PmTaskMethodForSample")
     pm_sample_property_values = Set("PmSamplePropertyValue")
     pm_used_properties = Set("PmSampleSetUsedProperties")
+    pm_sample_set_property_values = Set("PmSampleSetPropertyValue")
 
     RID = PrimaryKey(int, auto=True, column="RID")
     Name = Required(str, column="Name")
@@ -643,6 +645,7 @@ class PmProperty(db.Entity):
     pm_property_class = Required(PmPropertyClass, column="PCID")
     pm_sample_property_values = Set("PmSamplePropertyValue")
     pm_used_properties = Set("PmSampleSetUsedProperties")
+    pm_sample_set_property_values = Set("PmSampleSetPropertyValue")
 
     RID = PrimaryKey(int, auto=True, column="RID")
     Name = Required(str, column="Name")
@@ -715,3 +718,18 @@ class PmTaskMethodForSample(db.Entity):
     @property
     def sp_own_type(self):
         return None
+
+
+class PmSampleSetPropertyValue(db.Entity):
+    _table_ = "PMSampleSetPropertyValues"
+
+    pm_sample_set = Required(PMSampleSet, column="SSID")
+    pm_method = Required(PmTestMethod, column="TMID")
+    pm_property = Required(PmProperty, column="PRID")
+    RID = PrimaryKey(int, auto=True, column="RID")
+    MinValue = Required(float, column="MinValue")
+    MaxValue = Required(float, column="MaxValue")
+    AvgValue = Required(float, column="AvgValue")
+    SampleCnt = Required(int, column="SampleCnt")
+    RootMeanSqrDev = Required(float, column="RootMeanSqrDev")
+    VariationCoef = Required(float, column="VariationCoef")

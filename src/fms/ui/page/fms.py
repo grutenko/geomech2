@@ -1,4 +1,5 @@
 import wx
+import wx.lib.agw.flatnotebook
 
 from src.ui.icon import get_icon
 
@@ -10,7 +11,9 @@ class FmsPage(wx.Panel):
     def __init__(self, parent):
         super().__init__(parent)
         sz = wx.BoxSizer(wx.VERTICAL)
-        self.notebook = wx.Notebook(self)
+        self.notebook = wx.lib.agw.flatnotebook.FlatNotebookCompatible(
+            self, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON
+        )
         self.tree = TreePage(self.notebook)
         self.table = FmsTable(self.notebook)
         self.notebook.AddPage(self.tree, "Данные")

@@ -4,7 +4,7 @@ from typing import Dict, Iterable
 
 import wx
 import wx.lib.agw.flatnotebook
-from pony.orm import commit, count, db_session, select
+from pony.orm import commit, db_session, select
 from wx.grid import GridCellAutoWrapStringEditor, GridCellEditor, GridCellRenderer, GridCellStringRenderer
 
 from src.bore_hole.ui.choice import Choice as BoreHoleChoice

@@ -221,7 +221,7 @@ class Column:
     id: any
     cell_type: CellType
     name_short: str
-    name_long: str | None
+    name_long: str | None = None
     init_width: int = -1
     optional: bool = False
 
@@ -875,9 +875,17 @@ class GridEditor(wx.Panel):
             wx.PostEvent(self, GridEditorStateChangedEvent(target=self))
 
     class OpenInExcellTask(TaskJob):
-        def __init__(self, model):
+        def __init__(self, model, view):
             super().__init__()
             self.model = model
+            self.view = view
+
+        def col_letter(self, n):
+            result = ""
+            while n >= 0:
+                result = chr(n % 26 + ord("A")) + result
+                n = n // 26 - 1
+            return result
 
         def run(self):
             import pandas as pd
@@ -897,9 +905,13 @@ class GridEditor(wx.Panel):
                 rows.append(row)
             df = pd.DataFrame(rows, columns=columns_names)
             wb = xw.Book()  # Открывает новое окно Excel
-            sht = wb.sheets[0]
+            sht: xw.Sheet = wb.sheets[0]
             sht.name = "Сводка ФМС"
             rows_len, cols_len = df.shape
+            for index in range(self.view.GetNumberCols()):
+                sht.range("%s:%s" % (self.col_letter(index + 1), self.col_letter(index + 1))).column_width = int(
+                    min(self.view.GetColSize(index) / 7, 255)
+                )
             sht.range("A1").value = df  # Записывает таблицу в Excel
             for index, column in enumerate(columns):
                 if not isinstance(column.cell_type, FloatCellType):
@@ -910,7 +922,7 @@ class GridEditor(wx.Panel):
         self.excell_task = Task(
             "Экспорт в excell",
             "Идет экспорт в excell...",
-            self.OpenInExcellTask(self._model),
+            self.OpenInExcellTask(self._model, self._view),
             self,
             can_abort=False,
             show_time=False,
