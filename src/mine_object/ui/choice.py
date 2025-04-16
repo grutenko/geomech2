@@ -78,7 +78,7 @@ class Choice(wx.Panel):
 
         if self.selection is not None:
             for _i, o in enumerate(self.items):
-                if type(o) == type(self.selection) and o.RID == self.selection.RID:
+                if type(o) == type(self.selection) and o.RID == self.selection.RID:  # noqa: E721
                     self.selection = o
                     self.choice.SetSelection(_i)
                     break

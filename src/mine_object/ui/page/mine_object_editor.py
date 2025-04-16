@@ -182,12 +182,16 @@ class MineObjectEditor(wx.Panel):
             o = MineObject[self.o.RID]
             o.set(**fields)
         commit()
+        self.o = o
         if self.is_new:
             pubsub.pub.sendMessage("object.added", o=o)
             app_ctx().main.open(
                 "mine_object_editor", is_new=False, o=o, parent_object=None, tab_index=self.right.GetSelection()
             )
             app_ctx().main.close(self)
+        else:
+            wx.PostEvent(app_ctx().main, PageHdrChangedEvent(target=self))
+            pubsub.pub.sendMessage("object.updated", o=o)
 
     def get_name(self):
         if self.is_new:

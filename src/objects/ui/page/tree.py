@@ -651,6 +651,7 @@ class _TreeWidget(TreeWidget):
         self.Bind(EVT_WIDGET_TREE_MENU, self._on_node_context_menu)
         self.Bind(EVT_WIDGET_TREE_ACTIVATED, self._on_node_activated)
         pubsub.pub.subscribe(self.on_objects_changed, "object.added")
+        pubsub.pub.subscribe(self.on_objects_changed, "object.updated")
 
     def make_node(self, o):
         node = None
@@ -692,6 +693,7 @@ class _TreeWidget(TreeWidget):
         node = self.make_node(o)
         if node is not None:
             self.soft_reload_childrens(node.get_parent())
+            self.soft_reload_node(node)
 
     def _create_node(self, o):
         if isinstance(o, MineObject):
@@ -977,15 +979,10 @@ class _TreeWidget(TreeWidget):
         self._open_context_menu(event.node, event.point)
 
     def reload_object(self, o):
-        if isinstance(o, MineObject):
-            node = _MineObject_Node(o)
-        elif isinstance(o, Station):
-            node = _Station_Node(o)
-        elif isinstance(o, BoreHole):
-            node = _BoreHole_Node(o)
-        else:
-            return
-        self.soft_reload_node(node)
+        node = self.make_node(o)
+        print(node)
+        if node is not None:
+            self.soft_reload_node(node)
 
     def _on_open_self_editor(self, event):
         wx.PostEvent(self, OpenSelfEditorEvent(target=self._current_object))
