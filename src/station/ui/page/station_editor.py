@@ -1,14 +1,12 @@
 import pubsub.pub
 import wx
-import wx.lib.agw.flatnotebook
 import wx.propgrid
-from pony.orm import commit, db_session, select
+from pony.orm import commit, db_session
 
 from src.ctx import app_ctx
 from src.database import MineObject, Station
 from src.datetimeutil import decode_date, encode_date
 from src.mine_object.ui.choice import Choice as MineObjectChoice
-from src.ui.flatnotebook import xFlatNotebook
 from src.ui.icon import get_icon
 from src.ui.page import PageHdrChangedEvent
 from src.ui.supplied_data import SuppliedDataWidget
@@ -26,6 +24,7 @@ class StationEditor(wx.Panel):
         sz = wx.BoxSizer(wx.VERTICAL)
         self.toolbar = wx.ToolBar(self, style=wx.TB_HORZ_TEXT)
         self.toolbar.AddTool(wx.ID_SAVE, "Сохранить", get_icon("save"))
+        self.toolbar.AddTool(wx.ID_SAVEAS, "Сохранить и закрыть", get_icon("save"))
         self.toolbar.Realize()
         sz.Add(self.toolbar, 0, wx.EXPAND)
         self.splitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)
@@ -37,6 +36,15 @@ class StationEditor(wx.Panel):
         left_sz_in.Add(label, 0)
         self.field_mine_object = MineObjectChoice(self.left)
         left_sz_in.Add(self.field_mine_object, 0, wx.EXPAND | wx.BOTTOM, border=10)
+
+        self.number = None
+        if self.is_new:
+            label = wx.StaticText(self.left, label="№ станции *")
+            left_sz_in.Add(label, 0)
+            self.field_number = wx.TextCtrl(self.left, size=wx.Size(250, 25))
+            self.field_number.SetValidator(TextValidator(lenMin=1, lenMax=256))
+            left_sz_in.Add(self.field_number, 0, wx.EXPAND | wx.BOTTOM, border=10)
+            self.field_number.Bind(wx.EVT_KEY_UP, self.on_orig_no_updated)
 
         label = wx.StaticText(self.left, label="Название *")
         left_sz_in.Add(label, 0)
@@ -67,7 +75,7 @@ class StationEditor(wx.Panel):
         self.left.SetVirtualSize(self.left.GetBestSize() + (250, 250))
         self.left.SetScrollRate(10, 10)
 
-        self.right = xFlatNotebook(self.splitter, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON)
+        self.right = wx.Notebook(self.splitter)
         self.supplied_data = SuppliedDataWidget(
             self.right, deputy_text="Недоступно для новых объектов. Сначала сохраните."
         )
@@ -78,9 +86,9 @@ class StationEditor(wx.Panel):
         self.coords.Append(wx.propgrid.FloatProperty("X Макс.", "X_Max"))
         self.coords.Append(wx.propgrid.FloatProperty("Y Макс.", "Y_Max"))
         self.coords.Append(wx.propgrid.FloatProperty("Z Макс.", "Z_Max"))
-        self.right.AddPage(self.coords, "Координаты")
+        self.right.AddPage(self.coords, "Координаты [*]")
         self.right.AddPage(self.supplied_data, "Сопуствующие материалы")
-        self.splitter.SplitVertically(self.left, self.right, 270)
+        self.splitter.SplitVertically(self.left, self.right, 250)
         self.splitter.SetMinimumPaneSize(250)
         sz.Add(self.splitter, 1, wx.EXPAND)
         self.SetSizer(sz)
@@ -91,10 +99,7 @@ class StationEditor(wx.Panel):
             self.field_mine_object.Disable()
             self.supplied_data.start(self.o)
             app_ctx().recently_used.remember("tree", self.o.__class__.__qualname__, self.o.RID)
-        else:
-            self.right.enable_tab(1, enable=False)
-
-        if parent_object is not None:
+        elif parent_object is not None:
             self.field_mine_object.SetValue(parent_object)
 
     @db_session
@@ -112,6 +117,7 @@ class StationEditor(wx.Panel):
 
     def bind_all(self):
         self.toolbar.Bind(wx.EVT_TOOL, self.on_save, id=wx.ID_SAVE)
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_save_and_close, id=wx.ID_SAVEAS)
 
     @db_session
     def set_fields(self):
@@ -124,12 +130,60 @@ class StationEditor(wx.Panel):
 
     def get_name(self):
         if self.is_new:
-            return "(новый)"
+            return "(новый) Станция"
         return self.o.get_tree_name()
 
     def get_icon(self):
         return get_icon("file")
 
-    def on_save(self, event):
+    def on_save_and_close(self, event):
+        self.on_save(event, need_close=True)
+
+    @db_session
+    def on_save(self, event, need_close=False):
         if not self.Validate():
             return
+
+        if self.is_new:
+            fields = {
+                "mine_object": MineObject[self.field_mine_object.GetValue().RID],
+                "Number": self.number,
+                "Name": self.field_name.GetValue(),
+                "Comment": self.field_comment.GetValue(),
+                "StartDate": encode_date(self.field_start_date.GetValue()),
+                "EndDate": (
+                    encode_date(self.field_end_date.GetValue())
+                    if len(self.field_end_date.GetValue().strip()) > 0
+                    else None
+                ),
+                "HoleCount": 0,
+                "X": 0.0,
+                "Y": 0.0,
+                "Z": 0.0,
+            }
+            o = Station(**fields)
+        else:
+            fields = {
+                "Name": self.field_name.GetValue(),
+                "Comment": self.field_comment.GetValue(),
+                "StartDate": encode_date(self.field_start_date.GetValue()),
+                "EndDate": (
+                    encode_date(self.field_end_date.GetValue())
+                    if len(self.field_end_date.GetValue().strip()) > 0
+                    else None
+                ),
+            }
+            o = Station[self.o.RID]
+            o.set(**fields)
+        commit()
+        self.o = o
+        if self.is_new:
+            pubsub.pub.sendMessage("object.added", o=o)
+            if not need_close:
+                app_ctx().main.open("station_editor", is_new=False, o=o)
+            app_ctx().main.close(self)
+        else:
+            pubsub.pub.sendMessage("object.updated", o=o)
+            wx.PostEvent(app_ctx().main, PageHdrChangedEvent(target=self))
+            if need_close:
+                app_ctx().main.close(self)
