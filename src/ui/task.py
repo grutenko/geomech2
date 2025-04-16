@@ -35,16 +35,27 @@ class TaskJob(Protocol):
         ...
 
 
-class Task(wx.ProgressDialog):
+class Task(wx.Dialog):
     def __init__(self, title, message, job: TaskJob, parent=None, can_abort=True, show_time=True):
-        style = wx.PD_AUTO_HIDE
-        if can_abort:
-            style |= wx.PD_CAN_ABORT
-        if show_time:
-            style |= wx.PD_ESTIMATED_TIME | wx.PD_REMAINING_TIME
         if not isinstance(job, TaskJob):
             raise RuntimeError("invalid task job.")
-        super().__init__(title, message, style=style, parent=parent)
+        super().__init__(parent, title=title)
+        self.was_cancelled = False
+        sz = wx.BoxSizer(wx.VERTICAL)
+        sz_in = wx.BoxSizer(wx.VERTICAL)
+        self.message = wx.StaticText(self, label=message)
+        sz_in.Add(self.message, 0, wx.EXPAND)
+        self.gauge = wx.Gauge(self, size=wx.Size(300, -1))
+        sz_in.Add(self.gauge, 0, wx.EXPAND)
+        sz.Add(sz_in, 1, wx.EXPAND | wx.ALL, border=10)
+        line = wx.StaticLine(self)
+        sz.Add(line, 0, wx.EXPAND)
+        btn_sz = wx.StdDialogButtonSizer()
+        self.cancel = wx.Button(self, label="Отменить")
+        self.cancel.Bind(wx.EVT_BUTTON, self.on_cancel)
+        btn_sz.Add(self.cancel, 0)
+        sz.Add(btn_sz, 0, wx.ALIGN_RIGHT | wx.ALL, border=10)
+        self.SetSizer(sz)
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.on_alarm)
         self.job = job
@@ -59,6 +70,26 @@ class Task(wx.ProgressDialog):
 
         self._on_reject = on_reject
         self._is_cancel = False
+
+        self.Layout()
+        self.Fit()
+
+    def on_cancel(self, event):
+        self.was_cancelled = True
+
+    def Update(self, progress, message=None):
+        self.gauge.SetValue(progress)
+        if message is not None:
+            self.message.SetLabelText(message)
+
+    def SetRange(self, range):
+        self.gauge.SetRange(range)
+
+    def Pulse(self):
+        self.gauge.Pulse()
+
+    def WasCancelled(self):
+        return self.was_cancelled
 
     def is_cancel(self):
         return self._is_cancel
@@ -81,12 +112,10 @@ class Task(wx.ProgressDialog):
         self.timer.Stop()
         self.SetRange(1)
         self.Update(1)
-        self.Close()
         if self.status == "resolve":
             self._on_resolve(self._ret)
         elif self.status == "reject":
             self._on_reject(self._e)
-        self.Destroy()
 
     def then(self, on_resolve, on_reject):
         self._on_resolve = on_resolve
@@ -109,3 +138,4 @@ class Task(wx.ProgressDialog):
         self.thread = threading.Thread(target=task, args=(self.job,))
         self.thread.start()
         self.timer.Start(100)
+        self.ShowModal()
