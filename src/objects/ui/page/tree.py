@@ -789,7 +789,6 @@ class _TreeWidget(TreeWidget):
         sel = self.get_current_node()
         self.set_root_node(node)
         if sel is not None:
-        if sel is not None:
             self.select_node(sel)
         self._mode = mode
 
