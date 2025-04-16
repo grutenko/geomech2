@@ -90,7 +90,6 @@ class StationEditor(wx.Panel):
             self.set_fields()
             self.field_mine_object.Disable()
             self.supplied_data.start(self.o)
-            app_ctx().recently_used.remember("tree", self.o.__class__.__qualname__, self.o.RID)
         else:
             self.right.enable_tab(1, enable=False)
 
