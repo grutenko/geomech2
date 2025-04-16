@@ -55,4 +55,4 @@ class DownloadTask(TaskJob):
                         file.write(SuppliedDataPart[item.o.RID].DataContent)
                 self.set_progress(index + 1, len(self.items), path)
             for item in os.listdir(dir):
-                shutil.move(os.path.join(dir, item), self.dest)
+                shutil.copy(os.path.join(dir, item), os.path.join(self.dest, item))

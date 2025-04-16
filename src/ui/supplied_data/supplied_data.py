@@ -1,4 +1,6 @@
 import logging
+import os
+import tempfile
 
 import wx
 from pony.orm import db_session, select
@@ -10,8 +12,11 @@ from src.ui.icon import get_icon
 from src.ui.task import Task
 
 from .delete import DeleteTask
+from .download import DownloadItem, DownloadTask
 from .file import AddFileTask, FileDialog
 from .folder import FolderDialog
+from .icon import get_file_icon
+from .open import open_file
 
 
 def human_readable_size(num_bytes, precision=2):
@@ -22,6 +27,9 @@ def human_readable_size(num_bytes, precision=2):
             return f"{size:.{precision}f} {unit}"
         size /= 1024
     return f"{size:.{precision}f} ПБ"
+
+
+ext_icons = {}
 
 
 class SuppliedDataWidget(wx.Panel):
@@ -45,6 +53,7 @@ class SuppliedDataWidget(wx.Panel):
         self.tb.AddTool(wx.ID_DELETE, "Удалить", get_icon("delete"), shortHelp="Удалить")
         self.tb.Realize()
         self.sz.Add(self.tb, 0, wx.EXPAND)
+        self.ext_icons = {}
         self.image_list = wx.ImageList(16, 16)
         self.icon_book = self.image_list.Add(get_icon("book"))
         self.icon_folder = self.image_list.Add(get_icon("folder"))
@@ -77,6 +86,31 @@ class SuppliedDataWidget(wx.Panel):
         self.tree.Bind(wx.EVT_LEFT_DOWN, self.on_left_down)
         self.tree.Bind(wx.EVT_MOTION, self.on_mouse_move)
         self.tree.Bind(wx.EVT_LEFT_UP, self.on_left_up)
+        self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_activate)
+
+    def on_activate(self, event):
+        data = self.tree.GetItemPyData(self.tree.GetSelections().__getitem__(0))
+        if isinstance(data, SuppliedData):
+            return
+        _, ext = os.path.splitext(data.FileName)
+        dir = tempfile.mkdtemp()
+        self.open_file_path = os.path.join(dir, data.FileName)
+        item = DownloadItem(data.FileName, data)
+        self.download_task = Task("Загрузка", "Идет скачивание данных...", DownloadTask([item], dir), self)
+        try:
+            self.download_task.then(self.on_open_resolve, self.on_open_reject)
+            self.download_task.run()
+        except Exception as e:
+            self.download_task.Destroy()
+            raise e
+
+    def on_open_resolve(self, data):
+        self.download_task.Destroy()
+        open_file(self.open_file_path)
+
+    def on_open_reject(self, e):
+        self.download_task.Destroy()
+        raise e
 
     def on_left_down(self, event):
         self.start_pos = event.GetPosition()
@@ -240,8 +274,20 @@ class SuppliedDataWidget(wx.Panel):
     def on_select(self, event):
         self.update_controls_state()
 
+    def apply_ext_icon(self, ext):
+        global ext_icons
+        if ext not in ext_icons:
+            ext_icons[ext] = get_file_icon(ext)
+        if ext not in self.ext_icons and ext in ext_icons:
+            self.ext_icons[ext] = self.image_list.Add(ext_icons[ext])
+        if ext in self.ext_icons:
+            return self.ext_icons[ext]
+        return self.icon_file
+
     @db_session
     def load(self):
+        import os
+
         self.tree.DeleteAllItems()
         self.items = []
         self.tree_root = self.tree.AddRoot(self.o.get_tree_name(), image=self.icon_book, selImage=self.icon_book)
@@ -255,13 +301,18 @@ class SuppliedDataWidget(wx.Panel):
             self.tree.SetItemText(sp_item, sp.Comment if sp.Comment is not None else "", column=4)
             self.items.append(sp)
             for sp_part in select(o for o in SuppliedDataPart if o.parent == sp):
-                sp_part_item = self.tree.AppendItem(sp_item, sp_part.Name, image=self.icon_file, data=sp_part)
+                _, ext = os.path.splitext(sp_part.FileName)
+                sp_part_item = self.tree.AppendItem(
+                    sp_item, sp_part.Name.strip(), image=self.apply_ext_icon(ext), data=sp_part
+                )
                 self.tree.SetItemText(sp_part_item, "Файл", column=1)
                 self.tree.SetItemText(sp_part_item, human_readable_size(sp_part.size()), column=2)
                 self.tree.SetItemText(
                     sp_part_item, str(decode_date(sp_part.DataDate)) if sp_part.DataDate is not None else "", column=3
                 )
-                self.tree.SetItemText(sp_part_item, sp_part.Comment if sp_part.Comment is not None else "", column=4)
+                self.tree.SetItemText(
+                    sp_part_item, sp_part.Comment.strip() if sp_part.Comment is not None else "", column=4
+                )
                 self.items.append(sp_part)
         self.tree.ExpandAll()
 

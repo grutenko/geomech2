@@ -1,4 +1,4 @@
-from pony.orm import Database, Optional, PrimaryKey, Required, Set
+from pony.orm import Database, Optional, PrimaryKey, Required, Set, db_session, raw_sql, select
 
 db = Database()
 
@@ -290,6 +290,10 @@ class SuppliedDataPart(db.Entity):
     @property
     def sp_own_type(self):
         return None
+
+    @db_session
+    def size(self):
+        return select(raw_sql('length("DataContent")') for o in SuppliedDataPart if o.RID == self.RID).first()
 
 
 class RockBurst(db.Entity):
