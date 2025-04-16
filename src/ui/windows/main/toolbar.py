@@ -15,6 +15,4 @@ class MainToolbar(wx.ToolBar):
         self.AddCheckTool(ID_OPEN_DISCHARGE, "Разгрузка", get_icon("folder"))
         self.AddCheckTool(ID_OPEN_DOCUMENTS, "Документы", get_icon("folder"))
         self.AddSeparator()
-        # self.AddCheckTool(ID_OPEN_CONSOLE, "Консоль", get_icon("console"))
-        self.AddCheckTool(ID_OPEN_MAP, "Карта", get_icon("map"))
         self.Realize()

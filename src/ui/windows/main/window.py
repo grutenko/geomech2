@@ -6,7 +6,7 @@ import wx.aui
 from pony.orm import db_session
 
 from src.ctx import app_ctx
-from src.database import BoreHole, MineObject, Station, is_entity
+from src.database import is_entity
 from src.ui.icon import get_icon
 from src.ui.page import EVT_PAGE_HDR_CHANGED
 
@@ -15,7 +15,7 @@ from .actions import (
     ID_OPEN_CONSOLE,
     ID_OPEN_DISCHARGE,
     ID_OPEN_DOCUMENTS,
-    ID_OPEN_FMS_TREE,
+    ID_OPEN_FMS,
     ID_OPEN_MAP,
     ID_OPEN_ROCK_BURST_TREE,
     ID_OPEN_TREE,
@@ -145,6 +145,16 @@ class MainWindow(wx.Frame):
             from src.discharge.ui.page.list import DischargeList
 
             return DischargeList(self.notebook)
+
+        def stuf_editor_def(o=None, is_new=False, parent_object=None):
+            from src.orig_sample_set.ui.page.stuf_editor import StufEditor
+
+            return StufEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
+
+        def disperse_editor_def(o=None, is_new=False, parent_object=None):
+            from src.orig_sample_set.ui.page.disperse_editor import DisperseEditor
+
+            return DisperseEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
         self.page_def = {
             "tree": tree_def,

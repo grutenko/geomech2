@@ -3,7 +3,6 @@ from dataclasses import dataclass
 import wx
 
 from src.config import Config
-from src.recently_used import RecentlyUsed
 
 
 class MainWindowStub(wx.Frame):
@@ -17,7 +16,6 @@ class AppCtx:
     config: Config = None
     config_filename: str = None
     config_is_fallback_runtime: bool = False
-    recently_used: RecentlyUsed = None
     main: MainWindowStub = None
 
 

@@ -131,8 +131,6 @@ if __name__ == "__main__":
         _start_accept = True
 
     if _start_accept:
-        from src.recently_used import RecentlyUsed
-
         cfg = app_ctx().config
         src.database.connect(
             login=cfg.login, password=cfg.password, host=cfg.host, port=cfg.port, database=cfg.database
