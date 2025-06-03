@@ -18,7 +18,13 @@ from src.database import (
 )
 from src.delete_object import delete_object
 from src.ui.icon import get_art, get_icon
-from src.ui.tree import EVT_WIDGET_TREE_ACTIVATED, EVT_WIDGET_TREE_MENU, TreeNode, TreeWidget
+from src.ui.tree import (
+    EVT_WIDGET_TREE_ACTIVATED,
+    EVT_WIDGET_TREE_MENU,
+    EVT_WIDGET_TREE_SEL_CHANGED,
+    TreeNode,
+    TreeWidget,
+)
 
 
 class _MineObject_Node(TreeNode):
@@ -1016,7 +1022,10 @@ class PageTree(wx.Panel):
     def __init__(self, parent):
         super().__init__(parent)
         sz = wx.BoxSizer(wx.VERTICAL)
-        self.tree_search = wx.SearchCtrl(self, size=wx.Size(-1, 25))
+        self.splitter = wx.SplitterWindow(self)
+        self.left = wx.Panel(self.splitter)
+        left_sz = wx.BoxSizer(wx.VERTICAL)
+        self.tree_search = wx.SearchCtrl(self.left, size=wx.Size(-1, 25))
         self.mode = "all"
         self.menu = wx.Menu()
         menu = self.menu
@@ -1036,12 +1045,25 @@ class PageTree(wx.Panel):
         self.tree_search.Bind(wx.EVT_KEY_DOWN, self.on_key)
         menu.Bind(wx.EVT_MENU, self.on_mode_changed)
         self.tree_search.SetDescriptiveText("Введите часть названия")
-        sz.Add(self.tree_search, 0, wx.EXPAND)
-        self.tree = _TreeWidget(self)
-        sz.Add(self.tree, 1, wx.EXPAND)
+        left_sz.Add(self.tree_search, 0, wx.EXPAND)
+        self.tree = _TreeWidget(self.left)
+        self.tree.Bind(EVT_WIDGET_TREE_SEL_CHANGED, self.on_sel_changed)
+        left_sz.Add(self.tree, 1, wx.EXPAND)
+        self.left.SetSizer(left_sz)
+        self.splitter.Initialize(self.left)
+        sz.Add(self.splitter, 1, wx.EXPAND)
         self.SetSizer(sz)
         self.Layout()
         self.SetFocus()
+
+        from ._tree_object_fastview import TreeObjectFastView
+
+        self.fastview = TreeObjectFastView(self.splitter)
+
+    def on_sel_changed(self, event):
+        if event.node is not None:
+            self.fastview.start(event.node.o)
+            self.splitter.SplitVertically(self.left, self.fastview, sashPosition=-300)
 
     def on_key(self, event):
         key_code = event.GetKeyCode()
