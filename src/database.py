@@ -146,7 +146,7 @@ class BoreHole(db.Entity):
 
     @property
     def sp_own_type(self):
-        return "BORE_HOLE"
+        return "BOREHOLE"
 
 
 class OrigSampleSet(db.Entity):
