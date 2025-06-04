@@ -55,7 +55,11 @@ class Choice(wx.Panel):
             for o in q:
                 self.items.append(o)
                 self.choice.Append((" . " * o.Level) + o.get_tree_name())
-                if self.mode == "all" or (self.mode == "all_without_excavation" and o.Type != "HORIZON"):
+                if (
+                    self.mode == "all"
+                    or self.mode == "all_with_stations"
+                    or (self.mode == "all_without_excavation" and o.Type != "HORIZON")
+                ):
                     _r(o)
 
         if self.mode in ["all", "all_with_stations", "all_without_excavation"]:
