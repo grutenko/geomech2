@@ -42,7 +42,7 @@ class BoreHoleEditor(wx.Panel):
 
         self.number = None
         if self.is_new:
-            label = wx.StaticText(self.left, label="№ станции *")
+            label = wx.StaticText(self.left, label="№ скважины *")
             l_sz_in.Add(label, 0)
             self.field_number = wx.TextCtrl(self.left, size=wx.Size(250, 25))
             self.field_number.SetValidator(TextValidator(lenMin=1, lenMax=256))
