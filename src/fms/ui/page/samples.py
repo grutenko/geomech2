@@ -4,7 +4,6 @@ from pony.orm import db_session, select
 
 from src.database import PMSample, PmSamplePropertyValue
 from src.ui.icon import get_icon
-from src.ui.overlay import Overlay
 
 
 class PropertyValueEditor(wx.Dialog):

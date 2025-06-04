@@ -3,7 +3,7 @@ import wx.lib.agw.flatnotebook
 
 from src.ui.icon import get_icon
 
-from .table import FmsTable
+from .summary import FmsTable
 from .tree import TreePage
 
 
@@ -18,7 +18,6 @@ class FmsPage(wx.Panel):
         self.table = FmsTable(self.notebook)
         self.notebook.AddPage(self.tree, "Данные")
         self.notebook.AddPage(self.table, "Сводка")
-        self.notebook.AddPage(wx.Panel(self.notebook), "Статистика")
         self.notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.on_page_changed)
         sz.Add(self.notebook, 1, wx.EXPAND)
         self.SetSizer(sz)

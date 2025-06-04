@@ -87,14 +87,14 @@ class FilterPanel(wx.ScrolledWindow):
         self.toolbar.Realize()
         sz.Add(self.toolbar, 0, wx.EXPAND)
         sz_in = wx.BoxSizer(wx.VERTICAL)
-        self.use_filter_checkbox = wx.CheckBox(self, label="Использовать фильтр")
+        self.use_filter_checkbox = wx.CheckBox(self)
         self.use_filter_checkbox.Bind(wx.EVT_CHECKBOX, self.on_use_filter)
         sz_in.Add(self.use_filter_checkbox, 0, wx.EXPAND | wx.BOTTOM, border=10)
         self.use_filter_checkbox.SetValue(True)
         self.use_filter_checkbox.Hide()
 
-        self.contracts_colpane = xCollapsiblePane(self, label="Договоры")
-        p = self.contracts_colpane.GetPane()
+        self.contracts_colpane = wx.Panel(self)
+        p = self.contracts_colpane
         p_sz = wx.BoxSizer(wx.VERTICAL)
         btn_sz = wx.StdDialogButtonSizer()
         self.test_series_select_all = wx.Button(p, label="Выбрать все")
@@ -109,8 +109,8 @@ class FilterPanel(wx.ScrolledWindow):
         p.SetSizer(p_sz)
         sz_in.Add(self.contracts_colpane, 0, wx.GROW)
 
-        self.fields_colpane = xCollapsiblePane(self, label="Месторождения")
-        p = self.fields_colpane.GetPane()
+        self.fields_colpane = wx.Panel(self)
+        p = self.fields_colpane
         p_sz = wx.BoxSizer(wx.VERTICAL)
         btn_sz = wx.StdDialogButtonSizer()
         self.field_select_all = wx.Button(p, label="Выбрать все")
@@ -125,8 +125,8 @@ class FilterPanel(wx.ScrolledWindow):
         p.SetSizer(p_sz)
         sz_in.Add(self.fields_colpane, 0, wx.GROW)
 
-        self.date_colpane = xCollapsiblePane(self, label="Дата испытания")
-        p = self.date_colpane.GetPane()
+        self.date_colpane = wx.Panel(self)
+        p = self.date_colpane
         p_sz = wx.BoxSizer(wx.VERTICAL)
         self.test_date_checkbox = wx.CheckBox(p, label="Ограничить по дате")
         self.test_date_checkbox.Bind(wx.EVT_CHECKBOX, self.on_enable_date)
@@ -146,8 +146,8 @@ class FilterPanel(wx.ScrolledWindow):
         p.SetSizer(p_sz)
         sz_in.Add(self.date_colpane, 0, wx.GROW)
 
-        self.petrotype_colpane = xCollapsiblePane(self, label="Петротипы")
-        p = self.petrotype_colpane.GetPane()
+        self.petrotype_colpane = wx.Panel(self)
+        p = self.petrotype_colpane
         p_sz = wx.BoxSizer(wx.VERTICAL)
         btn_sz = wx.StdDialogButtonSizer()
         self.petrotype_select_all = wx.Button(p, label="Выбрать все")

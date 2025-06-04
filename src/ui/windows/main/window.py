@@ -112,7 +112,7 @@ class MainWindow(wx.Frame):
 
         def pm_test_series_editor_def(o=None, is_new=False, parent_object=None):
 
-            from src.fms.ui.page.test_series_editor import PmTestSeriesEditor
+            from fms.ui.page.test_series import PmTestSeriesEditor
 
             return PmTestSeriesEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
