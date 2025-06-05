@@ -1,6 +1,8 @@
 import wx
+import wx.lib.newevent
 import wx.propgrid
 from pony.orm import db_session
+from pubsub import pub
 from wx.lib.agw.flatnotebook import EVT_FLATNOTEBOOK_PAGE_CLOSING, FNB_NO_NAV_BUTTONS, FlatNotebookCompatible
 
 from src.database import BoreHole, CoordSystem, MineObject, Station
@@ -46,7 +48,7 @@ class BoreHoleFastview(wx.Panel):
         self.propgrid.SetPropertyReadOnly(prop)
         prop = self.propgrid.AppendIn(category, wx.propgrid.FloatProperty("Наклон (град.)", "Tilt"))
         self.propgrid.SetPropertyReadOnly(prop)
-        prop = self.propgrid.AppendIn(category, wx.propgrid.FloatProperty("Диаметр (м)", "Diameter"))
+        prop = self.propgrid.AppendIn(category, wx.propgrid.FloatProperty("Диаметр (мм)", "Diameter"))
         self.propgrid.SetPropertyReadOnly(prop)
         prop = self.propgrid.AppendIn(category, wx.propgrid.FloatProperty("Длина (м)", "Length"))
         self.propgrid.SetPropertyReadOnly(prop)
@@ -83,9 +85,13 @@ class BoreHoleFastview(wx.Panel):
         if o.EndDate is not None:
             date = decode_date(o.EndDate)
             fields["EndDate"] = wx.DateTime(date.day, date.month - 1, date.year)
+        else:
+            fields["EndDate"] = None
         if o.DestroyDate is not None:
             date = decode_date(o.DestroyDate)
             fields["DestroyDate"] = wx.DateTime(date.day, date.month - 1, date.year)
+        else:
+            fields["DestroyDate"] = None
         self.propgrid.SetPropertyValues(fields)
         self.Update()
         self.Show()
@@ -213,6 +219,8 @@ class StationFastview(wx.Panel):
         if o.EndDate is not None:
             date = decode_date(o.EndDate)
             fields["EndDate"] = wx.DateTime(date.day, date.month - 1, date.year)
+        else:
+            fields["EndDate"] = None
         self.propgrid.SetPropertyValues(fields)
         self.Update()
         self.Show()
@@ -221,13 +229,16 @@ class StationFastview(wx.Panel):
         self.Hide()
 
 
+FwCloseEvent, EVT_FW_CLOSE = wx.lib.newevent.NewEvent()
+
+
 class TreeObjectFastView(wx.Panel):
     def __init__(self, parent):
         super().__init__(parent)
         sz = wx.BoxSizer(wx.VERTICAL)
         self.notebooktab = FlatNotebookCompatible(self, style=FNB_NO_NAV_BUTTONS)
         sz.Add(self.notebooktab, 1, wx.EXPAND | wx.ALL, 0)
-        self.notebooktab.Bind(EVT_FLATNOTEBOOK_PAGE_CLOSING, lambda e: e.Veto())
+        self.notebooktab.Bind(EVT_FLATNOTEBOOK_PAGE_CLOSING, self.on_close)
         self.p = wx.Panel(self.notebooktab)
         self._deputy = _deputy(self.p)
         self._bore_hole = BoreHoleFastview(self.p)
@@ -243,6 +254,11 @@ class TreeObjectFastView(wx.Panel):
         self.notebooktab.AddPage(self.p, "Объект", True)
         self.SetSizer(sz)
         self.Hide()
+        self.current = None
+
+    def on_close(self, event):
+        wx.PostEvent(self, FwCloseEvent())
+        event.Veto()
 
     def start(self, o):
         if isinstance(o, MineObject):
@@ -259,13 +275,25 @@ class TreeObjectFastView(wx.Panel):
         self._sizer.Detach(1)
         self._sizer.Insert(1, new_win, 1, wx.EXPAND)
         new_win.start(o)
+        self.current = new_win
+        self.o = o
         self.Layout()
         self.Show()
+        pub.subscribe(self.on_object_updated, "object.updated")
+
+    def on_object_updated(self, o):
+        if isinstance(o, type(self.o)) and o.RID == self.o.RID and self.current is not None:
+            self.o = o
+            self.current.start(o)
 
     def stop(self):
+        if self.current is None:
+            return
         win = self._sizer.GetItem(1).GetWindow()
         win.end()
         self._sizer.Detach(1)
         self._sizer.Add(self._deputy, 1, wx.EXPAND)
         self.Layout()
         self.Hide()
+        self.current = None
+        pub.unsubscribe(self.on_object_updated, "object.updated")

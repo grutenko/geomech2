@@ -235,7 +235,6 @@ class BoreHoleEditor(wx.Panel):
                 "Diameter": self.props.GetPropertyValue("Diameter"),
                 "Length": self.props.GetPropertyValue("Length"),
             }
-            print(self.props.GetPropertyValue("Diameter"))
             o = BoreHole[self.o.RID]
             o.set(**fields)
             core = select(core for core in OrigSampleSet if core.bore_hole == o).first()

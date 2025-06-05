@@ -848,7 +848,6 @@ class GridEditor(wx.Panel):
 
     def _on_cell_dragged(self, event):
         column_index = event.GetRowOrCol()
-        self._original_col_sizes[column_index][0] = self._view.GetColSize(column_index) / self._zoom
         wx.PostEvent(
             self,
             GridColumnResized(

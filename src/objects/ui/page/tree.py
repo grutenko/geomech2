@@ -875,6 +875,7 @@ class _TreeWidget(TreeWidget):
         menu.AppendSeparator()
         item = menu.Append(wx.ID_ANY, "Удалить")
         item.SetBitmap(get_icon("delete", scale_to=16))
+        menu.Bind(wx.EVT_MENU, self._on_delete_bore_hole, item)
         menu.AppendSeparator()
         m = wx.Menu()
         orig_sample_set = select(o for o in OrigSampleSet if o.bore_hole == node.o).first()
@@ -1023,6 +1024,7 @@ class PageTree(wx.Panel):
         super().__init__(parent)
         sz = wx.BoxSizer(wx.VERTICAL)
         self.splitter = wx.SplitterWindow(self)
+        self.splitter.SetSashGravity(1)
         self.left = wx.Panel(self.splitter)
         left_sz = wx.BoxSizer(wx.VERTICAL)
         self.tree_search = wx.SearchCtrl(self.left, size=wx.Size(-1, 25))
@@ -1056,14 +1058,25 @@ class PageTree(wx.Panel):
         self.Layout()
         self.SetFocus()
 
-        from ._tree_object_fastview import TreeObjectFastView
+        from ._tree_object_fastview import EVT_FW_CLOSE, TreeObjectFastView
 
         self.fastview = TreeObjectFastView(self.splitter)
+        self.fastview.Bind(EVT_FW_CLOSE, self.on_fastview_close)
+
+    def on_fastview_close(self, event):
+        self.splitter.Unsplit(self.fastview)
+        self.fastview.stop()
+        app_ctx().config.tree_open_fastview = False
 
     def on_sel_changed(self, event):
-        if event.node is not None:
+        if app_ctx().config.tree_open_fastview is not None and not app_ctx().config.tree_open_fastview:
+            return
+        if event.node is not None and isinstance(event.node.o, (MineObject, Station, BoreHole)):
             self.fastview.start(event.node.o)
             self.splitter.SplitVertically(self.left, self.fastview, sashPosition=-300)
+        else:
+            self.fastview.stop()
+            self.splitter.Unsplit(self.fastview)
 
     def on_key(self, event):
         key_code = event.GetKeyCode()
