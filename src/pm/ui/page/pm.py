@@ -3,11 +3,11 @@ import wx.lib.agw.flatnotebook
 
 from src.ui.icon import get_icon
 
-from .summary import FmsTable
+from .summary import PmSummaryTable
 from .tree import TreePage
 
 
-class FmsPage(wx.Panel):
+class PmPage(wx.Panel):
     def __init__(self, parent):
         super().__init__(parent)
         sz = wx.BoxSizer(wx.VERTICAL)
@@ -15,7 +15,7 @@ class FmsPage(wx.Panel):
             self, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON
         )
         self.tree = TreePage(self.notebook)
-        self.table = FmsTable(self.notebook)
+        self.table = PmSummaryTable(self.notebook)
         self.notebook.AddPage(self.tree, "Данные")
         self.notebook.AddPage(self.table, "Сводка")
         self.notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.on_page_changed)

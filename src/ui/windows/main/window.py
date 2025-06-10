@@ -15,7 +15,7 @@ from .actions import (
     ID_OPEN_CONSOLE,
     ID_OPEN_DISCHARGE,
     ID_OPEN_DOCUMENTS,
-    ID_OPEN_FMS,
+    ID_OPEN_PM,
     ID_OPEN_MAP,
     ID_OPEN_ROCK_BURST_TREE,
     ID_OPEN_TREE,
@@ -101,7 +101,7 @@ class MainWindow(wx.Frame):
             return RockBurstEditor(self.notebook, o=o, is_new=is_new, parent_object=parent_object)
 
         def pm_sample_set_editor_def(o=None, is_new=False, parent_object=None):
-            from fms.ui.page.editor import PmSampleSetEditor
+            from pm.ui.page.editor import PmSampleSetEditor
 
             return PmSampleSetEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
@@ -112,12 +112,12 @@ class MainWindow(wx.Frame):
 
         def pm_test_series_editor_def(o=None, is_new=False, parent_object=None):
 
-            from fms.ui.page.test_series import PmTestSeriesEditor
+            from pm.ui.page import PmTestSeriesEditor
 
             return PmTestSeriesEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
         def documents_editor_def(o=None, is_new=False, parent_object=None):
-            from document.ui.page.editor import DocumentEditor
+            from document.ui.page import DocumentEditor
 
             return DocumentEditor(self.notebook, is_new=is_new, o=o, parent_object=parent_object)
 
@@ -131,10 +131,10 @@ class MainWindow(wx.Frame):
 
             return PageTree(self.notebook)
 
-        def fms_def():
-            from src.fms.ui.page.fms import FmsPage
+        def pm_def():
+            from src.pm.ui.page import PmPage
 
-            return FmsPage(self.notebook)
+            return PmPage(self.notebook)
 
         def rock_burst_list_def():
             from src.rock_burst.ui.page.list import RockBurstWidget
@@ -158,7 +158,7 @@ class MainWindow(wx.Frame):
 
         self.page_def = {
             "tree": tree_def,
-            "fms": fms_def,
+            "pm": pm_def,
             "rock_burst_list": rock_burst_list_def,
             "discharge_list": discharge_list_def,
             "pm_sample_set_editor": pm_sample_set_editor_def,
@@ -188,7 +188,7 @@ class MainWindow(wx.Frame):
         self.page_cmp_args = {
             "tree": lambda args0, args1: True,
             "map": lambda args0, args1: True,
-            "fms_tree": lambda args0, args1: True,
+            "pm_tree": lambda args0, args1: True,
             "discharge_list": lambda args0, args1: True,
             "console_editor": lambda args0, args1: True,
             "mine_object_editor": base_args_cmp,
@@ -225,7 +225,7 @@ class MainWindow(wx.Frame):
         self.Bind(EVT_PAGE_HDR_CHANGED, self.on_page_header_changed)
         self.Bind(wx.EVT_MENU, self.on_change_credentials, id=ID_CHANGE_CREDENTIALS)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_toggle_tree, id=ID_OPEN_TREE)
-        self.toolbar.Bind(wx.EVT_TOOL, self.on_toggle_fms, id=ID_OPEN_FMS)
+        self.toolbar.Bind(wx.EVT_TOOL, self.on_toggle_pm, id=ID_OPEN_PM)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_rock_bursts, id=ID_OPEN_ROCK_BURST_TREE)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_discharge_list, id=ID_OPEN_DISCHARGE)
         self.toolbar.Bind(wx.EVT_TOOL, self.on_open_documents, id=ID_OPEN_DOCUMENTS)
@@ -271,10 +271,10 @@ class MainWindow(wx.Frame):
         else:
             self.close(_ctx.o)
 
-    def on_toggle_fms(self, event):
-        _ctx = self.find_ctx_by_code("fms")
+    def on_toggle_pm(self, event):
+        _ctx = self.find_ctx_by_code("pm")
         if _ctx is None:
-            self.open("fms")
+            self.open("pm")
         else:
             self.close(_ctx.o)
 
@@ -415,7 +415,7 @@ class MainWindow(wx.Frame):
 
     def update_controls_state(self):
         self.toolbar.ToggleTool(ID_OPEN_TREE, self.find_ctx_by_code("tree") is not None)
-        self.toolbar.ToggleTool(ID_OPEN_FMS, self.find_ctx_by_code("fms") is not None)
+        self.toolbar.ToggleTool(ID_OPEN_PM, self.find_ctx_by_code("pm") is not None)
         self.toolbar.ToggleTool(ID_OPEN_ROCK_BURST_TREE, self.find_ctx_by_code("rock_burst_list") is not None)
         self.toolbar.ToggleTool(ID_OPEN_DISCHARGE, self.find_ctx_by_code("discharge_list") is not None)
         self.toolbar.ToggleTool(ID_OPEN_DOCUMENTS, self.find_ctx_by_code("documents_list") is not None)

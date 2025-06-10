@@ -14,7 +14,7 @@ from src.ui.tree import (
     TreeWidget,
 )
 
-from ..fms_db_import import FmsImportDialog
+from ..db_import import FmsImportDialog
 
 
 class _PmSampleSet_Node(TreeNode):

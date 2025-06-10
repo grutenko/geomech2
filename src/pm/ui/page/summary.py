@@ -39,38 +39,6 @@ class Filter:
 FilterChangedEvent, EVT_FILTER_CHANGED = wx.lib.newevent.NewEvent()
 
 
-class xCollapsiblePane(wx.Panel):
-    def __init__(self, parent, label):
-        super().__init__(parent)
-        sz = wx.BoxSizer(wx.VERTICAL)
-        self.label = label
-        self.btn = wx.ToggleButton(self, label=self.label + " ▼", style=wx.BORDER_NONE)
-        self.btn.SetBackgroundColour(parent.GetBackgroundColour())  # Чтобы не выделялась
-        self.btn.SetForegroundColour(wx.Colour(0, 0, 0))  # Например, синим
-        self.btn.SetFont(wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-        self.btn.SetCursor(wx.Cursor(wx.CURSOR_HAND))  # Курсор как у ссылки
-        self.btn.Bind(wx.EVT_TOGGLEBUTTON, self.on_click)
-        sz.Add(self.btn, 0, wx.ALIGN_LEFT)
-        self.panel = wx.Panel(self)
-        sz.Add(self.panel, 1, wx.EXPAND)
-        self.panel.Hide()
-        self.SetSizer(sz)
-        self.Layout()
-
-    def on_click(self, event):
-        if self.btn.GetValue():
-            self.panel.Show()
-            self.btn.SetLabel(self.label + " ▲")
-        else:
-            self.panel.Hide()
-            self.btn.SetLabel(self.label + " ▼")
-        self.Layout()
-        self.GetParent().Layout()
-
-    def GetPane(self):
-        return self.panel
-
-
 class FilterPanel(wx.ScrolledWindow):
     def __init__(self, parent, filter):
         super().__init__(parent, style=wx.VSCROLL)
@@ -308,7 +276,7 @@ class FilterPanel(wx.ScrolledWindow):
         wx.PostEvent(self, FilterChangedEvent())
 
 
-class FmsGridModel(Model):
+class PmGridModel(Model):
     def __init__(self):
         super().__init__()
         self.mode = "compact"
@@ -469,13 +437,13 @@ class FmsGridModel(Model):
         app_ctx().main.statusbar.SetStatusText("Время генерации: %f с." % (end_time - start_time), 3)
 
 
-class FmsTable(wx.Panel):
+class PmSummaryTable(wx.Panel):
     def __init__(self, parent):
         super().__init__(parent)
         sz = wx.BoxSizer(wx.VERTICAL)
         self.filter = Filter()
         self.started = False
-        self.model = FmsGridModel()
+        self.model = PmGridModel()
         self.splitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)
         p = wx.Panel(self.splitter)
         p_sz = wx.BoxSizer(wx.VERTICAL)
@@ -546,7 +514,7 @@ class FmsTable(wx.Panel):
             self.switch_to_extended_mode()
         else:
             self.switch_to_compact_mode()
-        app_ctx().config.fms_extended_mode = self.toolbar.GetToolState(wx.ID_PREVIEW)
+        app_ctx().config.pm_extended_mode = self.toolbar.GetToolState(wx.ID_PREVIEW)
 
     def on_refresh(self, event):
         self.model.load()
@@ -555,7 +523,7 @@ class FmsTable(wx.Panel):
 
     def start(self):
         if not self.started:
-            if app_ctx().config.fms_extended_mode:
+            if app_ctx().config.pm_extended_mode:
                 self.toolbar.ToggleTool(wx.ID_PREVIEW, True)
                 self.toolbar.Realize()
                 self.switch_to_extended_mode()

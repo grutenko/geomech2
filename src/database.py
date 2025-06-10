@@ -572,7 +572,7 @@ class PMSample(db.Entity):
     RID = PrimaryKey(int, auto=True, column="RID")
     Number = Required(str, column="Number")
     SetDate = Required(int, column="SetDate", size=64)
-    StartPosition = Required(float, column="StartPosition")
+    StartPosition = Optional(float, column="StartPosition")
     EndPosition = Optional(float, column="EndPosition")
     BoxNumber = Optional(str, column="BoxNumber")
     Length1 = Optional(float, column="Length1")

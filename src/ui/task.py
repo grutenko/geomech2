@@ -73,9 +73,11 @@ class Task(wx.Dialog):
 
         self.Layout()
         self.Fit()
+        self.Bind(wx.EVT_CLOSE, self.on_cancel)
 
     def on_cancel(self, event):
         self.was_cancelled = True
+        event.Skip()
 
     def Update(self, progress, message=None):
         self.gauge.SetValue(progress)
@@ -116,6 +118,7 @@ class Task(wx.Dialog):
             self._on_resolve(self._ret)
         elif self.status == "reject":
             self._on_reject(self._e)
+        self.Close()
 
     def then(self, on_resolve, on_reject):
         self._on_resolve = on_resolve
