@@ -24,6 +24,10 @@ from src.database import (
 )
 import time
 
+import warnings
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 PROPS_STARTED_INDEX = 24
 HANDMADE_PROPS = [
     ("Масса в естественно-влажном состоянии", 19),
@@ -56,20 +60,20 @@ PROPS = [
     ("Предел прочности при объемном сжатии", 76, 77, 78),
     ("Показатель абразивности", 79, 80, 81),
 ]
-BORE_HOLE_FIELD = 0
-SAMPLE_TYPE_FIELD = 0
+BORE_HOLE_FIELD = 5
+SAMPLE_TYPE_FIELD = 13
 TEST_SERIES_FIELD = 0
-DOC_DATE_FIELD = 0
-SAMPLE_SET_FIELD = 0
-MINE_OBJECT_FIELD = 0
-SAMPLE_FIELD = 0
-LENGTH1_FIELD = 0
-LENGTH2_FIELD = 0
-HEIGHT_FIELD = 0
-MASS_AIR_DRY_FIELD = 0
-START_POSITION_FIELD = 0
-END_POSITION_FIELD = 0
-BOX_NUMBER_FIELD = 0
+DOC_DATE_FIELD = 1
+SAMPLE_SET_FIELD = 9
+MINE_OBJECT_FIELD = 4
+SAMPLE_FIELD = 14
+LENGTH1_FIELD = 15
+LENGTH2_FIELD = 16
+HEIGHT_FIELD = 17
+MASS_AIR_DRY_FIELD = 18
+START_POSITION_FIELD = 7
+END_POSITION_FIELD = 8
+BOX_NUMBER_FIELD = 6
 SAMPLE_FIELDS = [("Набор испытаний", 1), ("Проба", 9), ("Образец", 14)]
 
 
@@ -82,65 +86,86 @@ class DoImportTask(TaskJob):
     def run(self):
         import pandas as pd
 
-        pm_samples = select(s for s in PMSample).prefetch(PMSample.pm_sample_set, PMSampleSet.pm_test_series)[:]
-        pm_properties = select(s for s in PmProperty)[:]
-        pm_methods = select(s for s in PmTestMethod)[:]
-        pm_equipments = select(s for s in PmTestEquipment)[:]
-        pm_test_series = select(s for s in PMTestSeries)[:]
-        pm_sample_sets = select(s for s in PMSampleSet)[:]
-        orig_sample_sets = select(s for s in OrigSampleSet)[:]
-        pm_property_values = select(s for s in PmSamplePropertyValue)[:]
-        documents = select(s for s in FoundationDocument)[:]
-        mine_objects = select(s for s in MineObject)[:]
+        pm_samples = list(select(s for s in PMSample).prefetch(PMSample.pm_sample_set, PMSampleSet.pm_test_series)[:])
+        pm_properties = list(select(s for s in PmProperty)[:])
+        pm_methods = list(select(s for s in PmTestMethod)[:])
+        pm_equipments = list(select(s for s in PmTestEquipment)[:])
+        pm_test_series = list(select(s for s in PMTestSeries)[:])
+        pm_sample_sets = list(select(s for s in PMSampleSet)[:])
+        pm_property_values = list(select(s for s in PmSamplePropertyValue)[:])
+        documents = list(select(s for s in FoundationDocument)[:])
+        mine_objects = list(select(s for s in MineObject)[:])
 
         threshold = 90
 
-        def find_test_series(name): ...
+        def find_test_series(name):
+            r = process.extractOne(name, [a.Name for a in pm_test_series], scorer=fuzz.ratio, score_cutoff=threshold)
+            if r is None:
+                return None
+            return pm_test_series[r[2]]
 
-        def find_sample_set(test_series, name): ...
+        def find_sample_set(test_series, name):
+            results = process.extract(
+                name, [a.Number for a in pm_sample_sets], scorer=fuzz.ratio, limit=1000, score_cutoff=100
+            )
+            for find_name, score, index in results:
+                result = pm_sample_sets[index]
+                if result.pm_test_series == test_series:
+                    return result
+            return None
 
         def find_sample(sample_set, name):
-            global pm_samples
             results = process.extract(
                 name, [a.Number for a in pm_samples], scorer=fuzz.ratio, limit=1000, score_cutoff=threshold
             )
             for find_name, score, index in results:
                 result = pm_samples[index]
-                if (
-                    result.pm_sample_set == sample_set
-                    and fuzz.ratio(result.pm_sample_set.pm_test_series.Name, test_series_name) >= threshold
-                ):
+                if result.pm_sample_set == sample_set:
                     return result
             return None
 
-        def find_orig_sample_set(mine_object, name, _type): ...
+        @db_session
+        def find_orig_sample_set(mine_object, name, _type):
+            return select(
+                o for o in OrigSampleSet if o.SampleType == _type and o.mine_object == mine_object and name in o.Number
+            ).first()
 
         def find_property(name):
-            global pm_properties
             r = process.extractOne(name, [a.Name for a in pm_properties], scorer=fuzz.ratio, score_cutoff=threshold)
             if r is None:
                 return None
             return pm_properties[r[2]]
 
-        def find_property_value(sample, property, method): ...
+        def find_property_value(sample, property, method):
+            for prop_value in pm_property_values:
+                if (
+                    prop_value.pm_sample == sample
+                    and prop_value.pm_property == property
+                    and prop_value.pm_test_method == method
+                ):
+                    return prop_value
+
+            return None
 
         def find_method(name):
-            global pm_methods
             r = process.extractOne(name, [a.Name for a in pm_methods], scorer=fuzz.ratio, score_cutoff=threshold)
             if r is None:
                 return None
             return pm_methods[r[2]]
 
         def find_equipment(name):
-            global pm_equipments
             r = process.extractOne(name, [a.Name for a in pm_equipments], scorer=fuzz.ratio, score_cutoff=threshold)
             if r is None:
                 return None
             return pm_equipments[r[2]]
 
-        def find_document(name, date=None): ...
+        def find_document(name, date=None):
+            print(name)
+            return select(o for o in FoundationDocument if name == o.Number).first()
 
-        def find_mine_object(name): ...
+        @db_session
+        def find_mine_object(name):
+            return select(o for o in MineObject if name in o.Name and o.Type == "FIELD").first()
 
         column_list = []
         df_column = pd.read_excel(self.path, 0).columns
@@ -154,6 +179,10 @@ class DoImportTask(TaskJob):
             if index == 0:
                 continue
 
+            self.set_progress(index, df.shape[0])
+
+            print(row[1][SAMPLE_FIELD])
+
             # Выбрать столбцы для серии испытаний найти в БД. Найти в бд договор с таким номером если не выдать ошибку. Если есть создать и связать
             # Выбрать столбцы для пробы найти в бд или создать и связать с серией испытаний
             # Выбрать столбцы для набора образцов (скважина, штуф или дисперсный материал) найти в бд или выдать ошибку
@@ -161,13 +190,23 @@ class DoImportTask(TaskJob):
             # Выбрать столбцы для handmade props найти свойство Физическая энциклопедия и связать значение если нет выдать ошибку
             # Выбрать другие свойства с методами и используемым оборудованием связать с образцом методом испытаний и используемым оборудованием если метода или используемого оборудования нет то выдать ошибку
 
-            test_series_name = "№" + row[1][TEST_SERIES_FIELD] + " " + row[1][DOC_DATE_FIELD]
+            if len(str(row[1][TEST_SERIES_FIELD])) == 0 or pd.isna(row[1][TEST_SERIES_FIELD]):
+                continue
+
+            test_series_name = (
+                "№"
+                + str(row[1][TEST_SERIES_FIELD])
+                + " "
+                + ".".join(reversed(str(row[1][DOC_DATE_FIELD]).split(" ")[0].split("-")))
+            )
+            print(test_series_name)
             test_series = find_test_series(test_series_name)
             if test_series is None:
                 document = find_document(row[1][TEST_SERIES_FIELD])
                 if document is None:
                     raise Exception("Документ №%s отсутствует в базе данных." % row[1][TEST_SERIES_FIELD])
                 test_series = PMTestSeries(Number=test_series_name, foundation_document=document)
+                pm_test_series.append(test_series)
 
             sample_set = find_sample_set(test_series, row[1][SAMPLE_SET_FIELD])
             if sample_set is None:
@@ -180,6 +219,7 @@ class DoImportTask(TaskJob):
                     Number=row[1][SAMPLE_SET_FIELD],
                     RealDetails=True,
                 )
+                pm_sample_sets.append(sample_set)
 
             sample = find_sample(sample_set, row[1][SAMPLE_FIELD])
             if sample is None:
@@ -187,7 +227,7 @@ class DoImportTask(TaskJob):
                     name = row[1][BORE_HOLE_FIELD]
                     _type = "CORE"
                 else:
-                    name = test_series_name + "" + row[1][SAMPLE_SET_FIELD]
+                    name = test_series_name
                     if row[1][SAMPLE_TYPE_FIELD] == "Штуф":
                         _type = "STUFF"
                     else:
@@ -196,54 +236,102 @@ class DoImportTask(TaskJob):
                 if orig_sample_set is None:
                     raise Exception("Набор образцов %s отсутствует в базе данных." % name)
 
+                print("Create %s - %s - %s\n" % (test_series.Name, sample_set.Number, row[1][SAMPLE_FIELD]))
+
                 sample = PMSample(
                     pm_sample_set=sample_set,
                     orig_sample_set=orig_sample_set,
-                    Number=str(row[1][SAMPLE_SET_FIELD]),
+                    Number=row[1][SAMPLE_FIELD],
                     SetDate=encode_date(row[1][DOC_DATE_FIELD]),
-                    Length1=float(row[1][LENGTH1_FIELD]),
-                    Length2=float(row[1][LENGTH2_FIELD]),
-                    Height=float(row[1][HEIGHT_FIELD]),
-                    MassAirDry=float(row[1][MASS_AIR_DRY_FIELD]),
+                    Length1=(
+                        float(row[1][LENGTH1_FIELD])
+                        if len(row[1][LENGTH1_FIELD]) > 0 and row[1][LENGTH1_FIELD] != "-"
+                        else None
+                    ),
+                    Length2=(
+                        float(row[1][LENGTH2_FIELD])
+                        if len(row[1][LENGTH2_FIELD]) > 0 and row[1][LENGTH2_FIELD] != "-"
+                        else None
+                    ),
+                    Height=(
+                        float(row[1][HEIGHT_FIELD])
+                        if len(row[1][HEIGHT_FIELD]) > 0 and row[1][HEIGHT_FIELD] != "-"
+                        else None
+                    ),
+                    MassAirDry=(
+                        float(row[1][MASS_AIR_DRY_FIELD])
+                        if len(row[1][MASS_AIR_DRY_FIELD]) > 0 and row[1][MASS_AIR_DRY_FIELD] != "-"
+                        else None
+                    ),
                 )
 
                 if _type == "CORE":
                     sample.StartPosition = float(row[1][START_POSITION_FIELD])
                     sample.EndPosition = float(row[1][END_POSITION_FIELD])
-                    sample.BoxNumber = float(row[1][BOX_NUMBER_FIELD])
+                    sample.BoxNumber = str(row[1][BOX_NUMBER_FIELD])
+
+                pm_samples.append(sample)
+            else:
+                print("Finded %s - %s - %s\n" % (test_series.Name, sample_set.Number, row[1][SAMPLE_FIELD]))
 
             method_for_handmade_props = find_method("Физическая энцклопедия")
             for prop_name, prop_index in HANDMADE_PROPS:
+                if len(row[1][prop_index]) == 0 or row[1][prop_index].strip() == "-":
+                    continue
+
                 prop = find_property(prop_name)
                 if prop is None:
                     raise Exception("Свойство %s отсутствует в базе данных." % prop_name)
-                value = PmSamplePropertyValue(
-                    pm_sample=sample,
-                    pm_test_method=method_for_handmade_props,
-                    pm_property=prop,
-                    Value=float(row[1][1][prop_index]),
-                )
+
+                if PmTaskMethodForSample.get(pm_sample=sample, pm_method=method_for_handmade_props) is None:
+                    PmTaskMethodForSample(
+                        pm_sample=sample, pm_method=method_for_handmade_props, pm_performed_task=PmPerformedTask[1]
+                    )
+                    print("Handmade PmTaskMethodForSample %s, %s" % (str(sample), str(method_for_handmade_props)))
+
+                value = find_property_value(sample, prop, method_for_handmade_props)
+                if value is None:
+                    value = PmSamplePropertyValue(
+                        pm_sample=sample,
+                        pm_test_method=method_for_handmade_props,
+                        pm_property=prop,
+                        Value=float(row[1][prop_index]),
+                    )
+                    pm_property_values.append(value)
+                else:
+                    value.Value = float(row[1][prop_index])
 
             for prop_name, prop_value_index, prop_method_index, prop_equipment_index in PROPS:
+                if len(row[1][prop_value_index]) == 0 or row[1][prop_value_index].strip() == "-":
+                    continue
+
                 prop = find_property(prop_name)
                 if prop is None:
                     raise Exception("Свойство %s отсутствует в базе данных." % prop_name)
-                prop_method = find_method(row[1][1][prop_method_index])
+                prop_method = find_method(row[1][prop_method_index])
                 if prop_method is None:
-                    raise Exception("Метод %s отсутствует в базе данных." % row[1][1][prop_method_index])
-                prop_equipment = find_equipment(row[1][1][prop_equipment_index])
-                if prop_equipment is None:
-                    raise Exception("Оборудование %s отсутствует в базе данных." % row[1][1][prop_equipment_index])
-                if (
-                    PmTaskMethodForSample.get(
-                        pm_sample=sample, pm_method=prop_method, pm_performed_task=PmPerformedTask[1]
-                    )
-                    is None
-                ):
+                    raise Exception("Метод %s отсутствует в базе данных." % row[1][prop_method_index])
+                if len(row[1][prop_equipment_index]) == 0 or row[1][prop_equipment_index].strip() == "-":
+                    prop_equipment = None
+                else:
+                    prop_equipment = find_equipment(row[1][prop_equipment_index])
+                    if prop_equipment is None:
+                        raise Exception("Оборудование %s отсутствует в базе данных." % row[1][prop_equipment_index])
+                if PmTaskMethodForSample.get(pm_sample=sample, pm_method=prop_method) is None:
                     PmTaskMethodForSample(pm_sample=sample, pm_method=prop_method, pm_performed_task=PmPerformedTask[1])
-                value = PmSamplePropertyValue(
-                    pm_sample=sample, pm_test_method=prop_method, pm_property=prop, Value=float(row[1][1][prop_index])
-                )
+                    print("PmTaskMethodForSample %s, %s" % (str(sample), str(prop_method)))
+
+                value = find_property_value(sample, prop, prop_method)
+                if value is None:
+                    value = PmSamplePropertyValue(
+                        pm_sample=sample,
+                        pm_test_method=prop_method,
+                        pm_property=prop,
+                        Value=float(row[1][prop_value_index]),
+                    )
+                    pm_property_values.append(value)
+                else:
+                    value.Value = float(row[1][prop_value_index])
 
         commit()
 
@@ -282,7 +370,7 @@ class FmsImportDialog(wx.Dialog):
         self.ok_btn.Enable(os.path.exists(self.file.GetPath()))
 
     def on_import(self, event):
-        self.task = Task("Импорт замеров...", "Идет импорт замеров", DoImportTask(), self)
+        self.task = Task("Импорт замеров...", "Идет импорт замеров", DoImportTask(self.file.GetPath()), self)
         self.task.then(self.on_import_resolve, self.on_import_reject)
         self.task.run()
 
