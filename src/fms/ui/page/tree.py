@@ -21,8 +21,14 @@ class _PmSampleSet_Node(TreeNode):
     def __init__(self, o):
         self.o = o
 
+    @db_session
+    def self_reload(self):
+        self.o = PMSampleSet[self.o.RID]
+
+    @db_session
     def get_name(self):
-        return self.o.get_tree_name()
+        samples_count = len(PMSampleSet[self.o.RID].pm_samples)
+        return self.o.get_tree_name() + (" (образцов: %d)" % samples_count)
 
     def get_icon(self):
         if self.o.RealDetails:
@@ -44,6 +50,7 @@ class _PmTestSeries_Node(TreeNode):
     def __init__(self, o):
         self.o = o
 
+    @db_session
     def get_name(self):
         return self.o.get_tree_name()
 

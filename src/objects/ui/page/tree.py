@@ -903,10 +903,6 @@ class _TreeWidget(TreeWidget):
         menu.AppendSubMenu(m, "Разгрузочные замеры")
         menu.Bind(wx.EVT_MENU, self._on_delete_bore_hole, item)
         menu.AppendSeparator()
-
-        item = menu.Append(wx.ID_ANY, "Сопутствующие материалы")
-        item.SetBitmap(get_icon("versions"))
-        menu.Bind(wx.EVT_MENU, self._on_open_supplied_data, item)
         self.PopupMenu(menu, point)
 
     def _on_create_core(self, event):
@@ -944,12 +940,16 @@ class _TreeWidget(TreeWidget):
         pubsub.pub.sendMessage("cmd.dm.delete", target=self, core=o)
 
     def _on_create_discharge_series(self, event):
-        ...
-        # Посылаем команду открытия окна создания серии замеров
+        app_ctx().main.open("test_series_editor", parent_object=self._current_object, is_new=True)
 
+    @db_session
     def _on_select_dm(self, event):
-        ...
-        # Посылаем запрос на открытие вкладки таблицы замеров для этого керна
+        disharge_series = select(
+            o
+            for o in DischargeSeries
+            if o.orig_sample_set in select(oo for oo in OrigSampleSet if oo.bore_hole == self._current_object)
+        ).first()
+        app_ctx().main.open("test_series_editor", o=disharge_series, is_new=False)
 
     def _on_open_supplied_data(self, event):
         pubsub.pub.sendMessage("cmd.supplied_data.show", target=self)
@@ -1036,12 +1036,12 @@ class PageTree(wx.Panel):
         item = menu.AppendRadioItem(2, "Только Регионы")
         item = menu.AppendRadioItem(3, "Только Горные массивы")
         item = menu.AppendRadioItem(4, "Только Месторождения")
-        item = menu.AppendRadioItem(4, "Только Горизонты")
-        item = menu.AppendRadioItem(4, "Только Выработки")
-        item = menu.AppendRadioItem(5, "Только Станции")
-        item = menu.AppendRadioItem(6, "Только Скважины")
-        item = menu.AppendRadioItem(7, "Только Штуфы")
-        item = menu.AppendRadioItem(8, "Только Дисперсные материалы")
+        item = menu.AppendRadioItem(5, "Только Горизонты")
+        item = menu.AppendRadioItem(6, "Только Выработки")
+        item = menu.AppendRadioItem(7, "Только Станции")
+        item = menu.AppendRadioItem(8, "Только Скважины")
+        item = menu.AppendRadioItem(9, "Только Штуфы")
+        item = menu.AppendRadioItem(10, "Только Дисперсные материалы")
         self.tree_search.SetMenu(menu)
         self.tree_search.Bind(wx.EVT_SEARCH, self.on_search)
         self.tree_search.Bind(wx.EVT_KEY_DOWN, self.on_key)

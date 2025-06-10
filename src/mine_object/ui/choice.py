@@ -69,7 +69,7 @@ class Choice(wx.Panel):
         elif self.mode == "rocks":
             q = select(o for o in MineObject if o.Type == "ROCKS")
         elif self.mode == "field":
-            q = select(o for o in MineObject if o.Type == "FIELDS")
+            q = select(o for o in MineObject if o.Type == "FIELD")
         elif self.mode == "horizon":
             q = select(o for o in MineObject if o.Type == "HORIZON")
         elif self.mode == "excavation":
