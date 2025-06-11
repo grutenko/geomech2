@@ -71,7 +71,7 @@ class _MineObject_Node(TreeNode):
                 nodes.append(_BoreHole_Node(o))
             for o in select(o for o in Station if o.mine_object.RID == self.o.RID).order_by(lambda x: desc(x.RID)):
                 nodes.append(_Station_Node(o))
-            for o in select(o for o in OrigSampleSet if o.mine_object.RID == self.o.RID and o.SampleType == "STUF"):
+            for o in select(o for o in OrigSampleSet if o.mine_object.RID == self.o.RID and o.SampleType == "STUFF"):
                 nodes.append(_Stuf_Node(o))
             for o in select(o for o in OrigSampleSet if o.mine_object.RID == self.o.RID and o.SampleType == "DISPERSE"):
                 nodes.append(_Disperse_Node(o))
@@ -144,7 +144,6 @@ class _BoreHole_Node(TreeNode):
 
     def get_icon(self) -> Tuple[str, wx.Bitmap] | None:
         return "file", get_icon("file", 16)
-        return "file", get_icon("file", 16)
 
     def is_leaf(self):
         return True
@@ -156,7 +155,7 @@ class _BoreHole_Node(TreeNode):
 class _Stuf_Node(TreeNode):
     @db_session
     def __init__(self, o: OrigSampleSet):
-        self.o = BoreHole[o.RID]
+        self.o = OrigSampleSet[o.RID]
         self.p_mine_object = self.o.mine_object
 
     @db_session
@@ -182,7 +181,7 @@ class _Stuf_Node(TreeNode):
 class _Disperse_Node(TreeNode):
     @db_session
     def __init__(self, o: OrigSampleSet):
-        self.o = BoreHole[o.RID]
+        self.o = OrigSampleSet[o.RID]
         self.p_mine_object = self.o.mine_object
 
     @db_session
@@ -559,7 +558,7 @@ class _Q_Stuf_Node(TreeNode):
 
     @db_session
     def query(self):
-        return select(o for o in OrigSampleSet if self.q in o.Name and o.SampleType == "STUF")
+        return select(o for o in OrigSampleSet if self.q in o.Name and o.SampleType == "STUFF")
 
     @db_session
     def get_subnodes(self):
@@ -635,7 +634,7 @@ class _Q_Root_Node(TreeNode):
             nodes.append(_Q_Stations_Node(self.q, self))
         if self.mode == "all" or self.mode == "bore_holes":
             nodes.append(_Q_BoreHoles_Node(self.q, self))
-        if self.mode == "all" or self.mode == "stuf":
+        if self.mode == "all" or self.mode == "stuff":
             nodes.append(_Q_Stuf_Node(self.q, self))
         if self.mode == "all" or self.mode == "disperse":
             nodes.append(_Q_Disperse_Node(self.q, self))
@@ -667,7 +666,7 @@ class _TreeWidget(TreeWidget):
             node = _Station_Node(o)
         elif isinstance(o, BoreHole):
             node = _BoreHole_Node(o)
-        elif isinstance(o, OrigSampleSet) and o.SampleType == "STUF" and not self.find_mode:
+        elif isinstance(o, OrigSampleSet) and o.SampleType == "STUFF" and not self.find_mode:
             node = _Stuf_Node(o)
         elif isinstance(o, OrigSampleSet) and o.SampleType == "DISPERSE" and not self.find_mode:
             node = _Disperse_Node(o)
@@ -685,7 +684,7 @@ class _TreeWidget(TreeWidget):
             node = _Q_Result_Node(o, _Q_Stations_Node(self.q, self.get_current_root()))
         elif isinstance(o, BoreHole) and self.find_mode:
             node = _Q_Result_Node(o, _Q_BoreHoles_Node(self.q, self.get_current_root()))
-        elif isinstance(o, OrigSampleSet) and o.SampleType == "STUF" and self.find_mode:
+        elif isinstance(o, OrigSampleSet) and o.SampleType == "STUFF" and self.find_mode:
             node = _Q_Result_Node(o, _Q_Stuf_Node(self.q, self.get_current_root()))
         elif isinstance(o, OrigSampleSet) and o.SampleType == "DISPERSE" and self.find_mode:
             node = _Q_Result_Node(o, _Q_Disperse_Node(self.q, self.get_current_root()))
@@ -718,7 +717,7 @@ class _TreeWidget(TreeWidget):
             app_ctx().main.open("station_editor", is_new=False, o=event.node.o)
         elif isinstance(event.node.o, BoreHole):
             app_ctx().main.open("bore_hole_editor", is_new=False, o=event.node.o)
-        elif isinstance(event.node.o, OrigSampleSet) and event.node.o.SampleType == "STUF":
+        elif isinstance(event.node.o, OrigSampleSet) and event.node.o.SampleType == "STUFF":
             app_ctx().main.open("stuf_editor", is_new=False, o=event.node.o)
         elif isinstance(event.node.o, OrigSampleSet) and event.node.o.SampleType == "DISPERSE":
             app_ctx().main.open("disperse_editor", is_new=False, o=event.node.o)
@@ -1100,7 +1099,7 @@ class PageTree(wx.Panel):
             "excavations",
             "stations",
             "bore_holes",
-            "stuf",
+            "stuff",
             "disperse",
         ]
         self.mode = modes[_id - 1]
