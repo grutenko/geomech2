@@ -51,6 +51,10 @@ class _PmTestSeries_Node(TreeNode):
         self.o = o
 
     @db_session
+    def self_reload(self):
+        self.o = PMTestSeries[self.o.RID]
+
+    @db_session
     def get_name(self):
         return self.o.get_tree_name()
 
@@ -138,7 +142,12 @@ class TreePage(wx.Panel):
     def on_import(self, event):
         dlg = FmsImportDialog(self)
         if dlg.ShowModal() == wx.ID_OK:
-            ...
+            # Перезагрузит список Договоров из БД и мягко обновит дерево
+            # добавит то, чего нет, обновит то что изменилось, удалит то чего больше нет в бд все остальное трогать не будет
+            self.tree.soft_reload_childrens(_Root_Node())
+            for node in _Root_Node().get_subnodes():
+                self.tree.soft_reload_childrens(node)
+
         dlg.Destroy()
 
     def on_activate(self, event):
