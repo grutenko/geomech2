@@ -39,6 +39,7 @@ class StatsGridModel(Model):
             "pm_min_value": Column(id="pm_min_value", name_short="Мин.\nзначение", cell_type=FloatCellType()),
             "pm_max_value": Column(id="pm_max_value", name_short="Макс.\nзначение", cell_type=FloatCellType()),
             "pm_sample_cnt": Column(id="pm_sample_cnt", name_short="Количество\nобразцов", cell_type=NumberCellType()),
+            "pm_method": Column(id="pm_method", name_short="Метод испытаний", cell_type=StringCellType()),
         }
         self.rows = []
         self.pm_sample_set = None
