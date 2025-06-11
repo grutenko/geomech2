@@ -89,17 +89,17 @@ class PropertiesEditor(wx.Panel):
         self.propgrid.SetPropertyCell(self.section, 2, "Метод испытаний")
         self.propgrid.SetPropertyCell(self.section, 3, "Оборудование")
         if self.pm_sample.Length1 is not None:
-            p = self.propgrid.Append(wx.propgrid.FloatProperty("Сторона 1 (мм)", "Length1", self.pm_sample.Length1))
+            p = self.propgrid.Append(wx.propgrid.FloatProperty("Сторона 1 (см)", "Length1", self.pm_sample.Length1))
             self.propgrid.SetPropertyCell(p, 2, "-")
             self.propgrid.SetPropertyCell(p, 3, "-")
             self.properties.append(p)
         if self.pm_sample.Length2 is not None:
-            p = self.propgrid.Append(wx.propgrid.FloatProperty("Сторона 2 (мм)", "Length2", self.pm_sample.Length2))
+            p = self.propgrid.Append(wx.propgrid.FloatProperty("Сторона 2 (см)", "Length2", self.pm_sample.Length2))
             self.propgrid.SetPropertyCell(p, 2, "-")
             self.propgrid.SetPropertyCell(p, 3, "-")
             self.properties.append(p)
         if self.pm_sample.Height is not None:
-            p = self.propgrid.Append(wx.propgrid.FloatProperty("Высота (мм)", "Height", self.pm_sample.Height))
+            p = self.propgrid.Append(wx.propgrid.FloatProperty("Высота (см)", "Height", self.pm_sample.Height))
             self.propgrid.SetPropertyCell(p, 2, "-")
             self.propgrid.SetPropertyCell(p, 3, "-")
             self.properties.append(p)
