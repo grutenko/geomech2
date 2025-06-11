@@ -1,7 +1,6 @@
 import os
-
+import io
 import wx
-
 from pony.orm import db_session, commit, select
 from src.ui.icon import get_icon
 from src.ui.task import Task, TaskJob
@@ -15,14 +14,12 @@ from src.database import (
     PmTestMethod,
     PmTestEquipment,
     FoundationDocument,
-    BoreHole,
     OrigSampleSet,
     MineObject,
     PmTaskMethodForSample,
     PmPerformedTask,
     PmProperty,
 )
-import time
 
 import warnings
 
@@ -81,9 +78,14 @@ class DoImportTask(TaskJob):
     def __init__(self, path):
         super().__init__()
         self.path = path
+        self.changed_objects = []
 
     @db_session
     def run(self):
+        log = io.StringIO()
+        self.do_import(log)
+
+    def do_import(self, log):
         import pandas as pd
 
         pm_samples = list(select(s for s in PMSample).prefetch(PMSample.pm_sample_set, PMSampleSet.pm_test_series)[:])
@@ -93,8 +95,6 @@ class DoImportTask(TaskJob):
         pm_test_series = list(select(s for s in PMTestSeries)[:])
         pm_sample_sets = list(select(s for s in PMSampleSet)[:])
         pm_property_values = list(select(s for s in PmSamplePropertyValue)[:])
-        documents = list(select(s for s in FoundationDocument)[:])
-        mine_objects = list(select(s for s in MineObject)[:])
 
         threshold = 90
 
@@ -108,7 +108,7 @@ class DoImportTask(TaskJob):
             results = process.extract(
                 name, [a.Number for a in pm_sample_sets], scorer=fuzz.ratio, limit=1000, score_cutoff=100
             )
-            for find_name, score, index in results:
+            for _, _, index in results:
                 result = pm_sample_sets[index]
                 if result.pm_test_series == test_series:
                     return result
@@ -116,9 +116,9 @@ class DoImportTask(TaskJob):
 
         def find_sample(sample_set, name):
             results = process.extract(
-                name, [a.Number for a in pm_samples], scorer=fuzz.ratio, limit=1000, score_cutoff=threshold
+                name, [a.Number for a in pm_samples], scorer=fuzz.ratio, limit=1000, score_cutoff=100
             )
-            for find_name, score, index in results:
+            for _, _, index in results:
                 result = pm_samples[index]
                 if result.pm_sample_set == sample_set:
                     return result
@@ -160,7 +160,6 @@ class DoImportTask(TaskJob):
             return pm_equipments[r[2]]
 
         def find_document(name, date=None):
-            print(name)
             return select(o for o in FoundationDocument if name == o.Number).first()
 
         @db_session
@@ -173,15 +172,12 @@ class DoImportTask(TaskJob):
             column_list.append(i)
         converter = {col: str for col in column_list}
         df = pd.read_excel(self.path, sheet_name=0, header=0, converters=converter)
-        rows = []
 
         for index, row in enumerate(df.iterrows()):
             if index == 0:
                 continue
 
             self.set_progress(index, df.shape[0])
-
-            print(row[1][SAMPLE_FIELD])
 
             # Выбрать столбцы для серии испытаний найти в БД. Найти в бд договор с таким номером если не выдать ошибку. Если есть создать и связать
             # Выбрать столбцы для пробы найти в бд или создать и связать с серией испытаний
@@ -199,7 +195,6 @@ class DoImportTask(TaskJob):
                 + " "
                 + ".".join(reversed(str(row[1][DOC_DATE_FIELD]).split(" ")[0].split("-")))
             )
-            print(test_series_name)
             test_series = find_test_series(test_series_name)
             if test_series is None:
                 document = find_document(row[1][TEST_SERIES_FIELD])
@@ -236,7 +231,7 @@ class DoImportTask(TaskJob):
                 if orig_sample_set is None:
                     raise Exception("Набор образцов %s отсутствует в базе данных." % name)
 
-                print("Create %s - %s - %s\n" % (test_series.Name, sample_set.Number, row[1][SAMPLE_FIELD]))
+                log.write("Create %s - %s - %s\n" % (test_series.Name, sample_set.Number, row[1][SAMPLE_FIELD]))
 
                 sample = PMSample(
                     pm_sample_set=sample_set,
@@ -272,7 +267,7 @@ class DoImportTask(TaskJob):
 
                 pm_samples.append(sample)
             else:
-                print("Finded %s - %s - %s\n" % (test_series.Name, sample_set.Number, row[1][SAMPLE_FIELD]))
+                log.write("Finded %s - %s - %s\n" % (test_series.Name, sample_set.Number, row[1][SAMPLE_FIELD]))
 
             method_for_handmade_props = find_method("Физическая энцклопедия")
             for prop_name, prop_index in HANDMADE_PROPS:
@@ -374,7 +369,8 @@ class FmsImportDialog(wx.Dialog):
         self.task.then(self.on_import_resolve, self.on_import_reject)
         self.task.run()
 
-    def on_import_resolve(self, data): ...
+    def on_import_resolve(self, data):
+        wx.MessageBox("Импорт успешно завершено", "Импорт успешно завершен.")
 
     def on_import_reject(self, e):
         raise e
