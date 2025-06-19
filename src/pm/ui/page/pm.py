@@ -12,7 +12,7 @@ class PmPage(wx.Panel):
         super().__init__(parent)
         sz = wx.BoxSizer(wx.VERTICAL)
         self.notebook = wx.lib.agw.flatnotebook.FlatNotebookCompatible(
-            self, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON
+            self, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON | wx.lib.agw.flatnotebook.FNB_RIBBON_TABS
         )
         self.tree = TreePage(self.notebook)
         self.table = PmSummaryTable(self.notebook)

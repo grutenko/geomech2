@@ -124,7 +124,6 @@ class Documents(wx.Panel, listmix.ColumnSorterMixin):
         index = self._list.GetFirstSelected()
         if index == -1:
             return
-
         app_ctx().main.open("document_editor", is_new=False, o=self._items[index])
 
     def _on_delete(self, event):

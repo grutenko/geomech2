@@ -78,7 +78,7 @@ class MineObjectEditor(wx.Panel):
         self.coords.SetSplitterPosition(350)
         self.coords.Update()
         self.right.AddPage(self.coords, "Координаты")
-        self.right.AddPage(self.supplied_data, "Сопуствующие материалы", imageId=self.file_icon)
+        self.right.AddPage(self.supplied_data, "Сопуствующие материалы")
         self.splitter.SplitVertically(self.left, self.right, 270)
         self.splitter.SetMinimumPaneSize(250)
         self.right.SetSelection(tab_index)

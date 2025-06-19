@@ -5,6 +5,7 @@ from typing import List
 
 import wx
 import wx.adv
+import wx.dataview
 import wx.lib.agw.flatnotebook
 import wx.lib.newevent
 from pony.orm import db_session, exists, select
@@ -15,13 +16,22 @@ from src.database import (
     Petrotype,
     PetrotypeStruct,
     PmProperty,
+    PmPropertyClass,
     PMSample,
     PmSamplePropertyValue,
     PMSampleSet,
     PMTestSeries,
 )
 from src.datetimeutil import encode_date
-from src.ui.grid import EVT_GRID_EDITOR_STATE_CHANGED, Column, FloatCellType, GridEditor, Model, StringCellType
+from src.ui.grid import (
+    EVT_GRID_EDITOR_STATE_CHANGED,
+    Column,
+    FloatCellType,
+    GridEditor,
+    Model,
+    NumberCellType,
+    StringCellType,
+)
 from src.ui.icon import get_icon
 
 
@@ -34,6 +44,8 @@ class Filter:
     test_date_from: wx.DateTime = None
     test_date_to: wx.DateTime = None
     exclude_none_test_date: bool = False
+    properties: List[PmProperty] = None
+    properties_hide_no_values_samples: bool = False
 
 
 FilterChangedEvent, EVT_FILTER_CHANGED = wx.lib.newevent.NewEvent()
@@ -61,7 +73,34 @@ class FilterPanel(wx.ScrolledWindow):
         self.use_filter_checkbox.SetValue(True)
         self.use_filter_checkbox.Hide()
 
-        self.contracts_colpane = wx.Panel(self)
+        self.notebook = wx.Notebook(self, style=wx.NB_LEFT | wx.NB_MULTILINE | wx.NB_NOPAGETHEME)
+
+        p = wx.Panel(self.notebook)
+        p_sz = wx.BoxSizer(wx.VERTICAL)
+        btn_sz = wx.StdDialogButtonSizer()
+        self.properties_select_all = wx.Button(p, label="Выбрать все")
+        btn_sz.Add(self.properties_select_all, 0)
+        self.properties_remove_selection = wx.Button(p, label="Снять выделение")
+        self.properties_select_all.Bind(wx.EVT_BUTTON, self.on_properties_select_all)
+        self.properties_remove_selection.Bind(wx.EVT_BUTTON, self.on_properties_remove_selection)
+        btn_sz.Add(self.properties_remove_selection)
+        p_sz.Add(btn_sz, 0, wx.EXPAND)
+        self.properties_hide_no_values_samples = wx.CheckBox(p, label="Скрыть образцы без значений свойств")
+        p_sz.Add(self.properties_hide_no_values_samples, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, border=10)
+        self.properties_items = []
+        self.props_image_list = wx.ImageList(16, 16)
+        self.checked_icon = self.props_image_list.Add(get_icon("checkbox-checked"))
+        self.unchecked_icon = self.props_image_list.Add(get_icon("checkbox-unchecked"))
+        self.properties = wx.TreeCtrl(
+            p, style=wx.TR_DEFAULT_STYLE | wx.TR_HIDE_ROOT | wx.TR_MULTIPLE | wx.TR_HAS_BUTTONS
+        )
+        self.properties.Bind(wx.EVT_TREE_STATE_IMAGE_CLICK, self.on_properties_checked)
+        self.properties.SetStateImageList(self.props_image_list)
+        p_sz.Add(self.properties, 1, wx.EXPAND)
+        p.SetSizer(p_sz)
+        self.notebook.AddPage(p, "Свойства", select=True)
+
+        self.contracts_colpane = wx.Panel(self.notebook)
         p = self.contracts_colpane
         p_sz = wx.BoxSizer(wx.VERTICAL)
         btn_sz = wx.StdDialogButtonSizer()
@@ -72,12 +111,12 @@ class FilterPanel(wx.ScrolledWindow):
         self.test_series_remove_selection.Bind(wx.EVT_BUTTON, self.on_test_series_remove_selection)
         btn_sz.Add(self.test_series_remove_selection)
         p_sz.Add(btn_sz, 0, wx.EXPAND)
-        self.test_series = wx.CheckListBox(p, size=wx.Size(-1, 100))
-        p_sz.Add(self.test_series, 0, wx.EXPAND | wx.BOTTOM, border=10)
+        self.test_series = wx.CheckListBox(p)
+        p_sz.Add(self.test_series, 1, wx.EXPAND)
         p.SetSizer(p_sz)
-        sz_in.Add(self.contracts_colpane, 0, wx.GROW)
+        self.notebook.AddPage(self.contracts_colpane, "Договоры", select=False)
 
-        self.fields_colpane = wx.Panel(self)
+        self.fields_colpane = wx.Panel(self.notebook)
         p = self.fields_colpane
         p_sz = wx.BoxSizer(wx.VERTICAL)
         btn_sz = wx.StdDialogButtonSizer()
@@ -88,12 +127,12 @@ class FilterPanel(wx.ScrolledWindow):
         self.field_remove_selection.Bind(wx.EVT_BUTTON, self.on_field_remove_selection)
         btn_sz.Add(self.field_remove_selection)
         p_sz.Add(btn_sz, 0, wx.EXPAND)
-        self.fields = wx.CheckListBox(p, size=wx.Size(-1, 100))
-        p_sz.Add(self.fields, 0, wx.EXPAND | wx.BOTTOM, border=10)
+        self.fields = wx.CheckListBox(p)
+        p_sz.Add(self.fields, 1, wx.EXPAND)
         p.SetSizer(p_sz)
-        sz_in.Add(self.fields_colpane, 0, wx.GROW)
+        self.notebook.AddPage(self.fields_colpane, "Меторождения", select=False)
 
-        self.date_colpane = wx.Panel(self)
+        self.date_colpane = wx.Panel(self.notebook)
         p = self.date_colpane
         p_sz = wx.BoxSizer(wx.VERTICAL)
         self.test_date_checkbox = wx.CheckBox(p, label="Ограничить по дате")
@@ -112,9 +151,9 @@ class FilterPanel(wx.ScrolledWindow):
         self.checkbox_exclude_none_test_date = wx.CheckBox(p, label="Исключить пробы без даты испытания")
         p_sz.Add(self.checkbox_exclude_none_test_date, 0, wx.EXPAND | wx.BOTTOM, border=10)
         p.SetSizer(p_sz)
-        sz_in.Add(self.date_colpane, 0, wx.GROW)
+        self.notebook.AddPage(self.date_colpane, "Дата испытания", select=False)
 
-        self.petrotype_colpane = wx.Panel(self)
+        self.petrotype_colpane = wx.Panel(self.notebook)
         p = self.petrotype_colpane
         p_sz = wx.BoxSizer(wx.VERTICAL)
         btn_sz = wx.StdDialogButtonSizer()
@@ -125,12 +164,14 @@ class FilterPanel(wx.ScrolledWindow):
         self.petrotype_remove_selection.Bind(wx.EVT_BUTTON, self.on_petrotype_remove_selection)
         btn_sz.Add(self.petrotype_remove_selection)
         p_sz.Add(btn_sz)
-        self.field_petrotypes = wx.CheckListBox(p, size=wx.Size(-1, 100))
-        p_sz.Add(self.field_petrotypes, 0, wx.EXPAND)
+        self.field_petrotypes = wx.CheckListBox(p)
+        p_sz.Add(self.field_petrotypes, 1, wx.EXPAND)
         p.SetSizer(p_sz)
-        sz_in.Add(self.petrotype_colpane, 0, wx.GROW)
+        self.notebook.AddPage(self.petrotype_colpane, "Литотипы", select=False)
 
-        sz.Add(sz_in, 1, wx.EXPAND | wx.ALL, border=10)
+        sz_in.Add(self.notebook, 1, wx.EXPAND)
+
+        sz.Add(sz_in, 1, wx.EXPAND)
         self.SetSizer(sz)
         self.Layout()
         self.load()
@@ -204,8 +245,85 @@ class FilterPanel(wx.ScrolledWindow):
         for i in range(self.field_petrotypes.GetCount()):
             self.field_petrotypes.Check(i, check=False)
 
+    @dataclass
+    class PropertyState:
+        prop: PmProperty
+        checked: bool
+
+    def on_properties_checked(self, event):
+        print(event)
+        item = event.GetItem()
+        if not item.IsOk():
+            return
+        state = self.properties.GetItemData(item)
+        if isinstance(state.prop, PmPropertyClass):
+            # Toggle all properties in the class
+            item, item_cookie = self.properties.GetFirstChild(item)
+            while item.IsOk():
+                self.properties.GetItemData(item).checked = not state.checked
+                item, item_cookie = self.properties.GetNextChild(item, item_cookie)
+            state.checked = not state.checked
+        else:
+            # Toggle single property
+            self.properties.GetItemData(item).checked = not state.checked
+        self.apply_property_check()
+
+    def on_properties_select_all(self, event):
+        class_, cookie = self.properties.GetFirstChild(self.properties.GetRootItem())
+        while class_.IsOk():
+            item, item_cookie = self.properties.GetFirstChild(class_)
+            class_state = self.properties.GetItemData(class_)
+            while item.IsOk():
+                self.properties.GetItemData(item).checked = True
+                item, item_cookie = self.properties.GetNextChild(class_, item_cookie)
+            class_state.checked = True
+            class_, cookie = self.properties.GetNextChild(class_, cookie)
+        self.apply_property_check()
+
+    def on_properties_remove_selection(self, event):
+        class_, cookie = self.properties.GetFirstChild(self.properties.GetRootItem())
+        while class_.IsOk():
+            item, item_cookie = self.properties.GetFirstChild(class_)
+            class_state = self.properties.GetItemData(class_)
+            while item.IsOk():
+                self.properties.GetItemData(item).checked = False
+                item, item_cookie = self.properties.GetNextChild(class_, item_cookie)
+            class_state.checked = False
+            class_, cookie = self.properties.GetNextChild(class_, cookie)
+        self.apply_property_check()
+
+    def apply_property_check(self):
+        class_, cookie = self.properties.GetFirstChild(self.properties.GetRootItem())
+        while class_.IsOk():
+            item, item_cookie = self.properties.GetFirstChild(class_)
+            class_state = self.properties.GetItemData(class_)
+            while item.IsOk():
+                state = self.properties.GetItemData(item)
+                if state.checked:
+                    self.properties.SetItemState(item, self.checked_icon)
+                else:
+                    self.properties.SetItemState(item, self.unchecked_icon)
+                item, item_cookie = self.properties.GetNextChild(class_, item_cookie)
+            if class_state.checked:
+                self.properties.SetItemState(class_, self.checked_icon)
+            else:
+                self.properties.SetItemState(class_, self.unchecked_icon)
+            class_, cookie = self.properties.GetNextChild(class_, cookie)
+        self.update_controls_state()
+
     @db_session
     def load(self):
+        self.properties.DeleteAllItems()
+        self.properties_items = []
+        root = self.properties.AddRoot("Свойства")
+        for o in select(o for o in PmPropertyClass):
+            item = self.properties.AppendItem(root, o.Name)
+            self.properties.SetItemData(item, self.PropertyState(o, True))
+            for p in o.pm_properties:
+                child = self.properties.AppendItem(item, p.Name)
+                self.properties.SetItemData(child, self.PropertyState(p, True))
+                self.properties_items.append(p)
+        self.apply_property_check()
         self.fields_items = []
         self.fields.Clear()
         for o in select(o for o in MineObject if o.Type == "FIELD"):
@@ -272,8 +390,50 @@ class FilterPanel(wx.ScrolledWindow):
         for index in range(self.test_series.GetCount()):
             if self.test_series.IsChecked(index):
                 self.filter.test_series.append(self.test_series_items[index])
-        self.filter.exclude_none_test_date = self.checkbox_exclude_none_test_date.GetValue()
+        class_, cookie = self.properties.GetFirstChild(self.properties.GetRootItem())
+        properties = []
+        while class_.IsOk():
+            item, item_cookie = self.properties.GetFirstChild(class_)
+            while item.IsOk():
+                state = self.properties.GetItemData(item)
+                if state.checked:
+                    properties.append(state.prop)
+                item, item_cookie = self.properties.GetNextChild(class_, item_cookie)
+            class_, cookie = self.properties.GetNextChild(class_, cookie)
+        self.filter.properties = properties
+        self.filter.properties_hide_no_values_samples = self.properties_hide_no_values_samples.GetValue()
         wx.PostEvent(self, FilterChangedEvent())
+
+
+def make_filter(filter):
+    query = (
+        select(o for o in PMSample)
+        .order_by(lambda a: (a.pm_sample_set.pm_test_series.Number, a.pm_sample_set.Number, a.Number))
+        .prefetch(
+            PMSample.pm_sample_property_values,
+            PMSample.pm_sample_set,
+            PMSampleSet.mine_object,
+            PMSampleSet.petrotype_struct,
+            PetrotypeStruct.petrotype,
+        )  # сразу подгружаем связаную таблицу знчений свойств (чтобы в цикле не загружать по отдельности)
+    )
+    date_from = encode_date(filter.test_date_from) if filter.test_date_from is not None else None
+    date_to = encode_date(filter.test_date_to) if filter.test_date_to is not None else None
+
+    if filter.use_filter and filter.petrotypes is not None:
+        query = query.filter(lambda a: a.pm_sample_set.petrotype_struct.petrotype in filter.petrotypes)
+    if filter.use_filter and filter.fields is not None:
+        query = query.filter(lambda a: a.pm_sample_set.mine_object in filter.fields)
+    if filter.use_filter and date_from is not None:
+        query = query.filter(lambda a: a.pm_sample_set.TestDate >= date_from)
+    if filter.use_filter and date_to is not None:
+        query = query.filter(lambda a: a.pm_sample_set.TestDate <= date_to)
+    if filter.use_filter and filter.exclude_none_test_date:
+        query = query.filter(lambda a: a.pm_sample_set.TestDate != None)  # noqa: E711
+    if filter.use_filter and filter.test_series is not None:
+        query = query.filter(lambda a: a.pm_sample_set.pm_test_series in filter.test_series)
+
+    return query
 
 
 class PmGridModel(Model):
@@ -359,45 +519,25 @@ class PmGridModel(Model):
     def load(self):
         start_time = time.perf_counter()
         self.rows = []
-        query = (
-            select(o for o in PMSample)
-            .order_by(lambda a: (a.pm_sample_set.pm_test_series.Number, a.pm_sample_set.Number, a.Number))
-            .prefetch(
-                PMSample.pm_sample_property_values,
-                PMSample.pm_sample_set,
-                PMSampleSet.mine_object,
-                PMSampleSet.petrotype_struct,
-                PetrotypeStruct.petrotype,
-            )  # сразу подгружаем связаную таблицу знчений свойств (чтобы в цикле не загружать по отдельности)
-        )
-        date_from = encode_date(self.filter.test_date_from) if self.filter.test_date_from is not None else None
-        date_to = encode_date(self.filter.test_date_to) if self.filter.test_date_to is not None else None
-
-        if self.filter.use_filter and self.filter.petrotypes is not None:
-            query = query.filter(lambda a: a.pm_sample_set.petrotype_struct.petrotype in self.filter.petrotypes)
-        if self.filter.use_filter and self.filter.fields is not None:
-            query = query.filter(lambda a: a.pm_sample_set.mine_object in self.filter.fields)
-        if self.filter.use_filter and date_from is not None:
-            query = query.filter(lambda a: a.pm_sample_set.TestDate >= date_from)
-        if self.filter.use_filter and date_to is not None:
-            query = query.filter(lambda a: a.pm_sample_set.TestDate <= date_to)
-        if self.filter.use_filter and self.filter.exclude_none_test_date:
-            query = query.filter(lambda a: a.pm_sample_set.TestDate != None)  # noqa: E711
-        if self.filter.use_filter and self.filter.test_series is not None:
-            query = query.filter(lambda a: a.pm_sample_set.pm_test_series in self.filter.test_series)
-
-        self.property_columns = {}
+        query = make_filter(self.filter)
         samples = query[:]
         # Выбираем все свойства - значения которых записны для выбранных образцов
-        properties = select(
-            o
-            for o in PmProperty
-            if exists(v for v in PmSamplePropertyValue if v.pm_property == o and v.pm_sample in samples)
-        )[:]
+
+        if self.filter.use_filter and self.filter.properties is not None:
+            properties = select(o for o in PmProperty if o in self.filter.properties)
+        else:
+            properties = select(
+                o
+                for o in PmProperty
+                if exists(v for v in PmSamplePropertyValue if v.pm_property == o and v.pm_sample in samples)
+            )
+
+        properties = properties[:]
 
         is_compact = self.mode == "compact"
 
         # Добавляем столбцы свойств для выбраных образцов
+        self.property_columns = {}
         for property in properties:
             name = property.Name + (", " + property.Unit if property.Unit is not None else "")
             name = textwrap.fill(name, width=20)
@@ -412,6 +552,12 @@ class PmGridModel(Model):
 
         # Добавляем все образцы в строки таблицы
         for sample in query:
+            if self.filter.properties_hide_no_values_samples:
+                if not any(
+                    [value.pm_property for value in sample.pm_sample_property_values if value.pm_property in properties]
+                ):
+                    continue
+
             # Набиваем все для обоих режимов, дальше исходя из заголовка таблица заберет то что нужно
             row = {
                 "test_series": sample.pm_sample_set.pm_test_series.Name,
@@ -427,7 +573,8 @@ class PmGridModel(Model):
             }
             if sample.orig_sample_set.SampleType == "CORE":
                 row["bore_hole"] = sample.orig_sample_set.bore_hole.get_number()
-            for value in sample.pm_sample_property_values:
+            value = [o for o in sample.pm_sample_property_values if o.pm_property in properties]
+            for value in value:
                 row[value.pm_property.Code] = str(value.Value)
                 row["%s_method" % value.pm_property.Code] = str(value.pm_test_method.Name)
             self.rows.append(row)
@@ -435,6 +582,120 @@ class PmGridModel(Model):
         self.make_columns_cache()
         end_time = time.perf_counter()
         app_ctx().main.statusbar.SetStatusText("Время генерации: %f с." % (end_time - start_time), 3)
+
+
+class PmStartGridModel(Model):
+    def __init__(self):
+        super().__init__()
+        self.columns = {
+            "pm_property": Column(id="pm_property", name_short="Свойство", cell_type=StringCellType()),
+            "litotype": Column(id="litotype", name_short="Литотип", cell_type=StringCellType()),
+            "pm_root_mean_sqr_dev": Column(
+                id="pm_root_mean_sqr_dev", name_short="Среднеквадратичное\nотклонение", cell_type=FloatCellType()
+            ),
+            "pm_variation_coeff": Column(
+                id="pm_variation_coeff", name_short="Коэффициент\nвариации", cell_type=FloatCellType()
+            ),
+            "pm_avg_value": Column(id="pm_avg_value", name_short="Среднее\nзначение", cell_type=FloatCellType()),
+            "pm_min_value": Column(id="pm_min_value", name_short="Мин.\nзначение", cell_type=FloatCellType()),
+            "pm_max_value": Column(id="pm_max_value", name_short="Макс.\nзначение", cell_type=FloatCellType()),
+            "pm_sample_cnt": Column(id="pm_sample_cnt", name_short="Количество\nобразцов", cell_type=NumberCellType()),
+            "pm_method": Column(id="pm_method", name_short="Метод испытаний", cell_type=StringCellType()),
+        }
+        self.filter = Filter()
+        self.rows = []
+
+    def get_columns(self):
+        return list(self.columns.values())
+
+    def get_value_at(self, col, row) -> str:
+        col_id = list(self.columns.values())[col].id
+        if col_id in self.rows[row]:
+            return self.rows[row][col_id]
+        return ""
+
+    def get_rows_count(self) -> int:
+        return len(self.rows)
+
+    def is_changed(self) -> bool:
+        return False
+
+    def total_rows(self):
+        return len(self.rows)
+
+    def set_value_at(self, col, row, value): ...
+    def insert_row(self, row): ...
+    def delete_row(self, row): ...
+    def get_row_state(self, row): ...
+    def validate(self): ...
+    def save(self): ...
+    def have_changes(self):
+        return False
+
+    def set_filter(self, filter):
+        self.filter = filter
+        self.load()
+
+    @db_session
+    def load(self):
+        self.rows = []
+
+        from collections import defaultdict
+
+        data = defaultdict(list)
+        query = make_filter(self.filter)
+        samples = query[:]
+        # Выбираем все свойства - значения которых записны для выбранных обраsзцов
+        properties = select(
+            o
+            for o in PmProperty
+            if exists(v for v in PmSamplePropertyValue if v.pm_property == o and v.pm_sample in samples)
+        )
+
+        if self.filter.use_filter and self.filter.properties is not None:
+            properties = properties.filter(lambda a: a in self.filter.properties)
+
+        properties = properties[:]
+
+        property_values = select(
+            v for v in PmSamplePropertyValue if v.pm_sample in samples and v.pm_property in properties
+        )[:]
+
+        for value in property_values:
+            # Аггрегируем значения по свойствам, литотипам и методам испытаний
+            data[
+                (value.pm_property, value.pm_sample.pm_sample_set.petrotype_struct.petrotype, value.pm_test_method)
+            ].append(value.Value)
+
+        for (property, petrotype, method), values in data.items():
+            # Считаем статистику по свойству
+            avg_value = sum(values) / len(values)
+            min_value = min(values)
+            max_value = max(values)
+            root_mean_sqr_dev = (sum((v - avg_value) ** 2 for v in values) / len(values)) ** 0.5
+            variation_coeff = root_mean_sqr_dev / avg_value if avg_value != 0 else 0
+
+            # Считаем количество образцов с этим свойством
+            sample_cnt = len(values)
+
+            # Считаем литотипы для этого свойства
+            litotype = petrotype.Name if petrotype else ""
+
+            self.rows.append(
+                {
+                    "pm_property": property.Name,
+                    "litotype": litotype,
+                    "pm_root_mean_sqr_dev": str(root_mean_sqr_dev),
+                    "pm_variation_coeff": str(variation_coeff),
+                    "pm_avg_value": str(avg_value),
+                    "pm_min_value": str(min_value),
+                    "pm_max_value": str(max_value),
+                    "pm_sample_cnt": str(sample_cnt),
+                    "pm_method": method.Name if method else "",
+                }
+            )
+
+        self.rows.sort(key=lambda x: (x["pm_property"], x["litotype"], x["pm_method"]))
 
 
 class PmSummaryTable(wx.Panel):
@@ -445,11 +706,10 @@ class PmSummaryTable(wx.Panel):
         self.started = False
         self.model = PmGridModel()
         self.splitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)
-        p = wx.Panel(self.splitter)
+        right = wx.Notebook(self.splitter, style=wx.NB_LEFT)
+        p = wx.Panel(right)
         p_sz = wx.BoxSizer(wx.VERTICAL)
         self.toolbar = wx.ToolBar(p, style=wx.TB_FLAT | wx.TB_HORZ_TEXT)
-        self.toolbar.AddTool(wx.ID_REFRESH, "Обновить", get_icon("update"))
-        self.toolbar.AddCheckTool(wx.ID_PREVIEW, "Расширеный вид", get_icon("file-view"))
         tool = self.toolbar.AddTool(wx.ID_COPY, "Копировать", get_icon("copy", scale_to=16), "Копировать")
         tool.Enable(False)
         self.toolbar.AddTool(wx.ID_OPEN, "Открыть в Excell", get_icon("excel"))
@@ -460,6 +720,23 @@ class PmSummaryTable(wx.Panel):
         )
         p_sz.Add(self.table, 1, wx.EXPAND)
         p.SetSizer(p_sz)
+        right.AddPage(p, "Таблица")
+        p_stats = wx.Panel(right)
+        self.stats_model = PmStartGridModel()
+        p_stats_sz = wx.BoxSizer(wx.VERTICAL)
+        self.stats_table = GridEditor(
+            p_stats,
+            self.stats_model,
+            app_ctx().main.menu,
+            self.toolbar,
+            app_ctx().main.statusbar,
+            header_height=40,
+            read_only=True,
+        )
+        self.stats_table.auto_size_columns()
+        p_stats_sz.Add(self.stats_table, 1, wx.EXPAND)
+        p_stats.SetSizer(p_stats_sz)
+        right.AddPage(p_stats, "Статистика")
         self.left = wx.ScrolledWindow(self.splitter)
         self.left_notebook = wx.lib.agw.flatnotebook.FlatNotebookCompatible(
             self.left, agwStyle=wx.lib.agw.flatnotebook.FNB_NO_X_BUTTON
@@ -469,7 +746,7 @@ class PmSummaryTable(wx.Panel):
         self.left_notebook.AddPage(self.filter_panel, "Фильтр")
         l_sz.Add(self.left_notebook, 1, wx.EXPAND)
         self.left.SetSizer(l_sz)
-        self.splitter.SplitVertically(self.left, p, 280)
+        self.splitter.SplitVertically(self.left, right, 320)
         self.splitter.SetMinimumPaneSize(250)
         self.splitter.SetSashGravity(0)
         sz.Add(self.splitter, 1, wx.EXPAND)
@@ -508,6 +785,10 @@ class PmSummaryTable(wx.Panel):
         self.model.load()
         self.table._render()
         self.table.auto_size_columns()
+        self.stats_model.set_filter(self.filter)
+        self.stats_model.load()
+        self.stats_table._render()
+        self.stats_table.auto_size_columns()
 
     def on_toggle_extended_mode(self, event=None):
         if self.toolbar.GetToolState(wx.ID_PREVIEW):
@@ -520,6 +801,9 @@ class PmSummaryTable(wx.Panel):
         self.model.load()
         self.table._render()
         self.table.auto_size_columns()
+        self.stats_model.load()
+        self.stats_table._render()
+        self.stats_table.auto_size_columns()
 
     def start(self):
         if not self.started:
@@ -529,6 +813,8 @@ class PmSummaryTable(wx.Panel):
                 self.switch_to_extended_mode()
             self.model.load()
             self.table._render()
+            self.stats_model.load()
+            self.stats_table._render()
             self.started = True
             self.table.apply_controls()
             self.table.auto_size_columns()

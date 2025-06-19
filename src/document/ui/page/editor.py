@@ -15,7 +15,7 @@ class DocumentEditor(wx.Panel):
     @db_session
     def __init__(self, parent, is_new=False, o=None, parent_object=None):
         self.is_new = is_new
-        self.o = select(o for o in FoundationDocument if o.RID == o.RID).first() if not is_new else None
+        self.o = select(oo for oo in FoundationDocument if oo.RID == o.RID).first() if not is_new else None
         self.parent_object = parent_object
         super().__init__(parent)
         sz = wx.BoxSizer(wx.VERTICAL)
@@ -78,7 +78,11 @@ class DocumentEditor(wx.Panel):
         if not self.Validate():
             return
 
-        fields = {"Type": self.field_type.GetValue().strip(), "Number": self.field_number.GetValue().strip(), "Comment": self.field_comment.GetValue().strip()}
+        fields = {
+            "Type": self.field_type.GetValue().strip(),
+            "Number": self.field_number.GetValue().strip(),
+            "Comment": self.field_comment.GetValue().strip(),
+        }
         if len(self.field_date.GetValue().strip()) > 0:
             fields["DocDate"] = encode_date(self.field_date.GetValue().strip())
         if self.is_new:

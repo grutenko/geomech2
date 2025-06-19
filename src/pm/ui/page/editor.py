@@ -14,13 +14,11 @@ from src.ui.grid import (
     FloatCellType,
     GridEditor,
     Model,
-    StringCellType,
     NumberCellType,
+    StringCellType,
 )
 from src.ui.icon import get_icon
-from src.ui.supplied_data import SuppliedDataWidget
 from src.ui.validators import DateValidator, TextValidator
-from src.datetimeutil import decode_date, encode_date
 
 from .samples import SamplesWidget
 

@@ -4,6 +4,7 @@ import wx.lib.agw.flatnotebook
 
 class xFlatNotebook(wx.lib.agw.flatnotebook.FlatNotebook):
     def __init__(self, *args, **kwargs):
+        kwargs["agwStyle"] |= wx.lib.agw.flatnotebook.FNB_RIBBON_TABS
         super().__init__(*args, **kwargs)
         self.disabled_tabs = set()
         self.Bind(wx.lib.agw.flatnotebook.EVT_FLATNOTEBOOK_PAGE_CHANGING, self.on_page_changing)
